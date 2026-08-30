@@ -1,42 +1,33 @@
-# Weather4Lox HA — test add-on 0.3.0
+# Weather4Lox HA — test add-on 0.3.3
 
 Home Assistant OS add-on that emulates the Loxone Gen-1 Weather Service on TCP port 6066.
 
-The project is being developed as a replacement for the LoxBerry Weather4Loxone setup. The implementation deliberately keeps a strong diagnostic focus so the real Miniserver can be tested safely before production use.
+The project is being developed as a replacement for the LoxBerry Weather4Loxone setup. The implementation keeps a strong diagnostic focus so the real Miniserver can be tested safely before production use.
 
 ## Provider selection
 
-The add-on supports three modes:
+Three modes are supported:
 
 - `openweathermap` → `weather.openweathermap` plus the configured OpenWeatherMap sensor entities
-- `dwd` → `weather.wertingen`
+- `dwd` → the configured DWD `weather.*` entity
 - `custom` → any Home Assistant `weather.*` entity configured as `custom_weather_entity`
 
 The selected provider is used for current conditions and forecast retrieval.
 
 ## Forecast engine
 
-The add-on requests Home Assistant's `weather.get_forecasts` service for `hourly` data and, when the hourly result is shorter than the configured target, also requests `daily` data.
+The add-on requests Home Assistant's `weather.get_forecasts` service for hourly data.
 
-The forecast normalizer creates a one-hour grid:
+The target is **181 hourly records**, matching the Loxone Gen-1 weather service layout used by the original Weather4Loxone integration.
 
-1. Real hourly values are used unchanged.
-2. Gaps between real hourly values can be linearly interpolated when `interpolate_missing_hours` is enabled.
-3. When hourly data ends early, daily data is used as a clearly marked fallback.
-4. If the provider temporarily fails, the last cached forecast can be served.
+- Real hourly values are used unchanged.
+- Missing gaps can be linearly interpolated.
+- DWD/custom providers can use daily data when hourly data ends early.
+- OpenWeatherMap deliberately does **not** repeat daily values as fake hourly records. If OWM cannot provide the complete hourly forecast, the real hourly part is retained and the missing hours are filled with smooth, deterministic synthetic continuation data.
+- Provider/entity are part of the cache identity, so switching between DWD and OpenWeatherMap cannot accidentally reuse the other provider's cache.
+- A cached forecast remains an additional last-resort fallback when enabled.
 
-The default target is 168 hourly data points (7 x 24). The target is configurable up to 240 hours.
-
-## Cache
-
-Forecast data is cached in the add-on `/data` directory so it survives a restart. The default cache TTL is 60 minutes. This prevents every Loxone request from triggering a new Home Assistant forecast request.
-
-Configuration:
-
-```yaml
-cache_ttl_minutes: 60
-fallback_to_cache: true
-```
+Synthetic records are marked internally with `_source: synthetic` and are reported in the diagnostics/logging.
 
 ## Diagnostics
 
@@ -52,7 +43,7 @@ http://HOME_ASSISTANT_IP:6066/health
 http://HOME_ASSISTANT_IP:6066/status
 ```
 
-Shows provider, entity, cache age, number of forecast entries, last error and request statistics.
+Shows provider, entity, cache age, forecast count, last error, request statistics and the last Loxone validation result.
 
 ### Current HA weather data
 
@@ -66,31 +57,31 @@ http://HOME_ASSISTANT_IP:6066/raw
 http://HOME_ASSISTANT_IP:6066/debug/forecast
 ```
 
-Use `?refresh=1` to bypass the fresh cache for a diagnostic request.
+Use `?refresh=1` to bypass the fresh provider cache.
 
 ### Exact Loxone response
 
 ```text
-http://HOME_ASSISTANT_IP:6066/debug/loxone/?user=test&coord=10.681,48.56&asl=450&format=1
+http://HOME_ASSISTANT_IP:6066/debug/loxone/?user=loxone_TEST&coord=10.681,48.56&asl=450&format=2&new_api=1
 ```
 
-`/forecast/` is the same Loxone response endpoint.
+`/forecast/` produces the same response.
 
-## Loxone compatibility
+## Loxone validation
 
-The response follows the documented Weather4Lox / Meteoblue-style XML/CSV structure:
+Before a response is sent, 0.3.3 validates:
 
-- `<mb_metadata>` header
-- semicolon-separated station columns
-- `<valid_until>`
-- `<station>` with hourly rows
-- 29 data columns
-- valid Meteoblue/Loxone `picto-code` values
-- explicit trailing semicolons
+- exactly 181 forecast rows
+- exactly 29 metadata columns
+- exactly 29 columns in every station row
+- numeric/finite weather values where required
+- `picto-code` values in the Loxone/Meteoblue-compatible range 1–35
+- complete `<mb_metadata>`, `<valid_until>` and `<station>` sections
+- no response truncation
 
-The icon mapping is kept separately in `loxone_pictos.json` so it can be maintained independently of the server code.
+The generated response is returned in full; no diagnostic `... (truncated)` text is ever inserted into the Loxone payload.
 
-## Configuration example
+## Configuration
 
 OpenWeatherMap:
 
@@ -106,22 +97,27 @@ weather_provider: dwd
 dwd_weather_entity: weather.wertingen
 ```
 
-Custom HA weather entity:
+Custom provider:
 
 ```yaml
 weather_provider: custom
 custom_weather_entity: weather.my_provider
 ```
 
-## Installation
+General defaults:
 
-Add the GitHub repository to Home Assistant's add-on/app repository list:
+```yaml
+target_hours: 181
+cache_ttl_minutes: 60
+fallback_to_cache: true
+interpolate_missing_hours: true
+synthetic_fallback: true
+country: Germany
+timezone: Europe/Berlin
+debug_logging: true
+```
 
-`https://github.com/hagenbogner-prog/weather4lox-ha`
-
-Install **Weather4Lox HA** and start it.
-
-## First test sequence
+## Test sequence
 
 From another device on the LAN:
 
@@ -129,8 +125,8 @@ From another device on the LAN:
 curl http://192.168.178.158:6066/health
 curl http://192.168.178.158:6066/status
 curl http://192.168.178.158:6066/raw
-curl http://192.168.178.158:6066/debug/forecast
-curl "http://192.168.178.158:6066/debug/loxone/?user=loxone_TEST&coord=10.681,48.56&asl=450&format=1"
+curl "http://192.168.178.158:6066/debug/forecast?refresh=1"
+curl "http://192.168.178.158:6066/debug/loxone/?user=loxone_TEST&coord=10.681,48.56&asl=450&format=2&new_api=1"
 ```
 
 DNS:
@@ -143,8 +139,8 @@ The result should point to the Home Assistant IP.
 
 ## Logging
 
-With `debug_logging: true`, the add-on logs request parameters, provider/entity selection, forecast counts, cache usage, interpolation/fallback counts and response size. Debug logging can be disabled after compatibility testing.
+With `debug_logging: true`, the add-on logs request parameters, provider/entity selection, HA forecast counts, cache usage, interpolation/fallback counts, synthetic fallback counts and the complete Loxone validation summary.
 
 ## Important
 
-This is a compatibility test build. The real Gen-1 Miniserver must be used to validate the final response. Do not remove the old LoxBerry setup until the Miniserver has successfully accepted the new service over several update cycles.
+This remains a compatibility test build. Keep the old LoxBerry setup available until the Gen-1 Miniserver has successfully accepted the new service over several update cycles.
