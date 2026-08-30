@@ -1,5 +1,5 @@
 name: Weather4Lox HA
-version: "0.3.4"
+version: "0.3.5"
 slug: weather4lox-ha
 description: Loxone Gen 1 Weather Service emulator for Home Assistant OS
 url: https://github.com/hagenbogner-prog/weather4lox-ha
@@ -36,7 +36,7 @@ options:
   cache_ttl_minutes: 60
   fallback_to_cache: true
   interpolate_missing_hours: true
-  synthetic_fallback: true
+  synthetic_fallback: false
   debug_logging: true
 schema:
   weather_provider: list(openweathermap|dwd|custom)
