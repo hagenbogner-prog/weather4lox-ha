@@ -30,10 +30,11 @@ options:
   wind_direction_sensor: sensor.openweathermap_windrichtung
   rain_sensor: sensor.openweathermap_regenintensitat
   snow_sensor: sensor.openweathermap_schneeintensitat
-  target_hours: 168
+  target_hours: 181
   cache_ttl_minutes: 60
   fallback_to_cache: true
   interpolate_missing_hours: true
+  synthetic_fallback: true
   debug_logging: true
 schema:
   weather_provider: list(openweathermap|dwd|custom)
@@ -54,4 +55,5 @@ schema:
   cache_ttl_minutes: int
   fallback_to_cache: bool
   interpolate_missing_hours: bool
+  synthetic_fallback: bool
   debug_logging: bool
