@@ -2,7 +2,7 @@
 import json
 import logging
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 from urllib.request import Request, urlopen
@@ -88,9 +88,6 @@ def weather_snapshot():
     entity = selected_weather_entity(o)
     data = state(entity)
     attrs = data.get("attributes", {})
-
-    # OpenWeatherMap uses the dedicated sensor entities supplied by the user.
-    # DWD can normally be read directly from the weather entity attributes.
     use_sensors = provider == "openweathermap"
     result = {
         "provider": provider,
@@ -117,14 +114,10 @@ def get_hourly_forecast():
     entity = selected_weather_entity(o)
     log.info("Requesting hourly forecast from Home Assistant: %s", entity)
     response = ha_service("weather", "get_forecasts", {"entity_id": entity, "type": "hourly"}, return_response=True)
-
-    # HA returns service_response keyed by entity_id.
     service_response = response.get("service_response", {})
     entity_response = service_response.get(entity, {})
     forecast = entity_response.get("forecast", [])
     if not forecast:
-        # Some HA versions/integrations may return the response under a slightly
-        # different structure. Keep the diagnostic information in the log.
         log.warning("No hourly forecast found. HA response: %s", json.dumps(response, ensure_ascii=False, default=str))
         return []
 
@@ -149,8 +142,6 @@ def parse_dt(value):
 
 
 def loxone_pictocode(condition):
-    # Weather4Lox/Loxone Gen-1 uses Meteoblue-style picto codes. The mapping is
-    # intentionally conservative; the Miniserver primarily uses these for icons.
     mapping = {
         "clear-night": 1,
         "sunny": 2,
@@ -192,9 +183,7 @@ def station_name():
 def get_sun_times():
     try:
         attrs = state("sun.sun").get("attributes", {})
-        sunrise = parse_dt(attrs.get("next_rising"))
-        sunset = parse_dt(attrs.get("next_setting"))
-        return sunrise, sunset
+        return parse_dt(attrs.get("next_rising")), parse_dt(attrs.get("next_setting"))
     except Exception:
         return None, None
 
@@ -206,13 +195,8 @@ def forecast_response(query):
     user = query.get("user", [""])[0]
     fmt = query.get("format", [""])[0]
     new_api = query.get("new_api", [""])[0]
+    log.info("Loxone request: user=%s coord=%s asl=%s format=%s new_api=%s", user, coord, asl, fmt, new_api)
 
-    log.info(
-        "Loxone request: user=%s coord=%s asl=%s format=%s new_api=%s",
-        user, coord, asl, fmt, new_api,
-    )
-
-    # coord is supplied by Loxone as longitude,latitude.
     try:
         longitude, latitude = [p.strip() for p in coord.split(",", 1)]
     except ValueError:
@@ -253,7 +237,6 @@ def forecast_response(query):
         humidity = safe_float(item.get("humidity"), safe_float(w.get("humidity")))
         snow_fraction = 1.0 if condition in ("snowy", "snowy-rainy") else 0.0
         picto = loxone_pictocode(condition)
-
         sunrise_text = sunrise.astimezone().strftime("%H:%M") if sunrise else ""
         sunset_text = sunset.astimezone().strftime("%H:%M") if sunset else ""
 
@@ -270,18 +253,11 @@ def forecast_response(query):
         rows.append(";".join(row))
 
     body = (
-        "<mb_metadata>\n"
-        + header
-        + "\n</mb_metadata>\n\n"
+        "<mb_metadata>\n" + header + "\n</mb_metadata>\n\n"
         + f"<valid_until>{valid_until}</valid_until>\n\n"
-        + "<station>\n"
-        + "\n".join(rows)
-        + "\n</station>\n"
+        + "<station>\n" + "\n".join(rows) + "\n</station>\n"
     )
-    log.info(
-        "Sending Weather4Lox response: %d forecast rows, %d bytes, valid_until=%s",
-        len(rows), len(body.encode("utf-8")), valid_until,
-    )
+    log.info("Sending Weather4Lox response: %d forecast rows, %d bytes, valid_until=%s", len(rows), len(body.encode("utf-8")), valid_until)
     return body
 
 
@@ -295,27 +271,20 @@ class Handler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         query = parse_qs(parsed.query)
         log.info("REQUEST %s %s query=%s", self.command, parsed.path, query)
-
         try:
             if parsed.path == "/health":
-                body = "lox-weather-ha-test: OK\n"
-                content_type = "text/plain; charset=utf-8"
+                status, body, content_type = 200, "lox-weather-ha-test: OK\n", "text/plain; charset=utf-8"
             elif parsed.path in ("/forecast", "/forecast/"):
-                body = forecast_response(query)
-                content_type = "text/plain; charset=utf-8"
+                status, body, content_type = 200, forecast_response(query), "text/plain; charset=utf-8"
             elif parsed.path == "/raw":
-                body = json.dumps(weather_snapshot(), ensure_ascii=False, indent=2, default=str)
-                content_type = "application/json; charset=utf-8"
+                status, body, content_type = 200, json.dumps(weather_snapshot(), ensure_ascii=False, indent=2, default=str), "application/json; charset=utf-8"
             elif parsed.path in ("/raw/forecast", "/debug/forecast"):
-                body = json.dumps(get_hourly_forecast(), ensure_ascii=False, indent=2, default=str)
-                content_type = "application/json; charset=utf-8"
+                status, body, content_type = 200, json.dumps(get_hourly_forecast(), ensure_ascii=False, indent=2, default=str), "application/json; charset=utf-8"
             else:
-                self.send_response(404)
-                body = "Not found\n"
-                content_type = "text/plain; charset=utf-8"
+                status, body, content_type = 404, "Not found\n", "text/plain; charset=utf-8"
 
             encoded = body.encode("utf-8")
-            self.send_response(200 if parsed.path in ("/health", "/forecast", "/forecast/", "/raw", "/raw/forecast", "/debug/forecast") else 404)
+            self.send_response(status)
             self.send_header("Content-Type", content_type)
             self.send_header("Content-Length", str(len(encoded)))
             self.end_headers()
