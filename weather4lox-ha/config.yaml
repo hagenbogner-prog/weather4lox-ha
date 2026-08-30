@@ -1,7 +1,7 @@
 name: Weather4Lox HA
-version: "0.2.0"
+version: "0.3.0"
 slug: weather4lox-ha
-description: Loxone Weather Service emulator for Home Assistant OS (experimental)
+description: Loxone Gen 1 Weather Service emulator for Home Assistant OS
 url: https://github.com/hagenbogner-prog/weather4lox-ha
 arch:
   - amd64
@@ -18,6 +18,8 @@ ports_description:
 options:
   weather_provider: openweathermap
   weather_entity: weather.openweathermap
+  dwd_weather_entity: weather.wertingen
+  custom_weather_entity: weather.openweathermap
   temperature_sensor: sensor.openweathermap_temperatur
   feels_like_sensor: sensor.openweathermap_gefuhlte_temperatur
   humidity_sensor: sensor.openweathermap_luftfeuchtigkeit
@@ -28,10 +30,18 @@ options:
   wind_direction_sensor: sensor.openweathermap_windrichtung
   rain_sensor: sensor.openweathermap_regenintensitat
   snow_sensor: sensor.openweathermap_schneeintensitat
-  dwd_weather_entity: weather.wertingen
+  target_hours: 168
+  cache_ttl_minutes: 60
+  fallback_to_cache: true
+  interpolate_missing_hours: true
+  debug_logging: true
+  country: Germany
+  timezone: Europe/Berlin
 schema:
-  weather_provider: list(openweathermap|dwd)
+  weather_provider: list(openweathermap|dwd|custom)
   weather_entity: str
+  dwd_weather_entity: str
+  custom_weather_entity: str
   temperature_sensor: str
   feels_like_sensor: str
   humidity_sensor: str
@@ -42,4 +52,10 @@ schema:
   wind_direction_sensor: str
   rain_sensor: str
   snow_sensor: str
-  dwd_weather_entity: str
+  target_hours: int
+  cache_ttl_minutes: int
+  fallback_to_cache: bool
+  interpolate_missing_hours: bool
+  debug_logging: bool
+  country: str
+  timezone: str
