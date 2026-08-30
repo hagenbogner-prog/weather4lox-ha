@@ -11,10 +11,11 @@ from urllib.request import HTTPError, Request, urlopen
 
 HOST = "0.0.0.0"
 PORT = 6066
-VERSION = "0.3.4"
+VERSION = "0.3.5"
 HA_API = "http://supervisor/core/api"
 TOKEN = os.environ.get("SUPERVISOR_TOKEN", "")
 CACHE_FILE = "/data/forecast_cache.json"
+PICTO_FILE = os.path.join(os.path.dirname(__file__), "loxone_pictos.json")
 TARGET_DEFAULT = 181
 COLUMNS = 29
 VALID_PICTOS = set(range(1, 36))
@@ -278,19 +279,25 @@ def obtain_forecast(force=False):
     if c and cache_fresh(c, provider, entity) and not force:
         return c.get("forecast", [])[:target], "cache", int(c.get("fallback_count", 0))
     hourly, daily, error = [], [], None
-    try: hourly = service_forecast(entity, "hourly"); log.info("Home Assistant returned %d hourly entries", len(hourly))
-    except Exception as exc: error = str(exc); last_error = error; log.warning("Hourly forecast failed: %s", exc)
-    if provider != "openweathermap" and len(hourly) < target:
-        try: daily = service_forecast(entity, "daily"); log.info("Home Assistant returned %d daily entries", len(daily))
-        except Exception as exc: log.warning("Daily forecast failed: %s", exc)
-    if provider == "openweathermap" and len(hourly) < target:
-        result, fallback_count = synthetic(hourly, target, snapshot()) if o.get("synthetic_fallback", True) else (hourly, 0)
-        source = "hourly+synthetic" if hourly else "synthetic"
-        log.warning("OpenWeatherMap forecast shorter than %d: generated %d synthetic entries", target, fallback_count)
-    else:
-        result, fallback_count, source = normalize(hourly, daily, target)
-        if len(result) < target and o.get("synthetic_fallback", True):
-            result, synthetic_count = synthetic(result, target, snapshot()); fallback_count += synthetic_count; source += "+synthetic"
+    try:
+        hourly = service_forecast(entity, "hourly")
+        log.info("Home Assistant returned %d hourly entries", len(hourly))
+    except Exception as exc:
+        error = str(exc); last_error = error; log.warning("Hourly forecast failed: %s", exc)
+    # Ask HA for daily data whenever hourly coverage is insufficient. This avoids
+    # fabricating a seven-day forecast when the provider can supply real daily data.
+    if len(hourly) < target:
+        try:
+            daily = service_forecast(entity, "daily")
+            log.info("Home Assistant returned %d daily entries", len(daily))
+        except Exception as exc:
+            log.warning("Daily forecast failed: %s", exc)
+    result, fallback_count, source = normalize(hourly, daily, target)
+    if len(result) < target and o.get("synthetic_fallback", False):
+        result, synthetic_count = synthetic(result, target, snapshot())
+        fallback_count += synthetic_count
+        source += "+synthetic"
+        log.warning("Forecast shorter than %d: generated %d synthetic entries", target, synthetic_count)
     if len(result) < target and o.get("fallback_to_cache", True) and c and c.get("provider") == provider and c.get("entity") == entity and len(c.get("forecast", [])) >= target:
         result, source, fallback_count = c["forecast"][:target], "cache", int(c.get("fallback_count", 0))
     if not result: raise RuntimeError(error or "No forecast data available")
@@ -299,8 +306,18 @@ def obtain_forecast(force=False):
     return result[:target], source, fallback_count
 
 
+def load_pictos():
+    try:
+        with open(PICTO_FILE, encoding="utf-8") as f:
+            mapping = json.load(f)
+        return {str(k).lower(): int(v) for k, v in mapping.items() if str(k) != "_default" and int(v) in VALID_PICTOS}, int(mapping.get("_default", 22))
+    except (OSError, ValueError, TypeError):
+        return {"sunny": 1, "clear-night": 1, "partlycloudy": 7, "cloudy": 22, "fog": 16, "rainy": 23, "pouring": 25, "snowy": 24, "snowy-rainy": 35, "lightning": 27, "lightning-rainy": 28, "hail": 32, "windy": 19, "windy-variant": 20, "exceptional": 22}, 22
+
+
 def condition_picto(condition):
-    return {"sunny": 1, "clear-night": 1, "partlycloudy": 7, "cloudy": 22, "fog": 16, "rainy": 23, "pouring": 25, "snowy": 24, "snowy-rainy": 35, "lightning": 27, "lightning-rainy": 28, "hail": 32, "windy": 19, "windy-variant": 20}.get(str(condition or "").lower(), 22)
+    mapping, default = load_pictos()
+    return mapping.get(str(condition or "").lower(), default)
 
 
 def picto(item):
@@ -415,7 +432,7 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
-    o = opts(); log.info("Weather4Lox HA %s starting on %s:%d", VERSION, HOST, PORT); log.info("Config: provider=%s entity=%s dwd_entity=%s target_hours=%s synthetic_fallback=%s debug_logging=%s", o.get("weather_provider"), selected_entity(o), o.get("dwd_weather_entity"), o.get("target_hours", TARGET_DEFAULT), o.get("synthetic_fallback", True), o.get("debug_logging", True)); ThreadingHTTPServer((HOST, PORT), Handler).serve_forever()
+    o = opts(); log.info("Weather4Lox HA %s starting on %s:%d", VERSION, HOST, PORT); log.info("Config: provider=%s entity=%s dwd_entity=%s target_hours=%s synthetic_fallback=%s debug_logging=%s", o.get("weather_provider"), selected_entity(o), o.get("dwd_weather_entity"), o.get("target_hours", TARGET_DEFAULT), o.get("synthetic_fallback", False), o.get("debug_logging", True)); ThreadingHTTPServer((HOST, PORT), Handler).serve_forever()
 
 
 if __name__ == "__main__": main()
