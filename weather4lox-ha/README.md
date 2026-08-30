@@ -38,7 +38,7 @@ Version 0.3.5 keeps the proven 0.3.4 forecast engine and adds a compatibility la
 - Preserves sunrise/sunset values when the selected Home Assistant weather entity exposes them.
 - Keeps the Loxone response at exactly 29 columns per station row and validates the picto code range.
 
-Home Assistant's `weather.get_forecasts` response explicitly defines fields such as temperature, apparent temperature, humidity, cloud coverage, precipitation, precipitation probability, pressure, wind bearing and wind speed; providers may omit fields they do not supply. citeturn2search0turn2search5
+Home Assistant's `weather.get_forecasts` response provides fields such as temperature, apparent temperature, humidity, cloud coverage, precipitation, precipitation probability, pressure, wind bearing and wind speed. Providers may omit fields they do not supply.
 
 ## Diagnostics
 
