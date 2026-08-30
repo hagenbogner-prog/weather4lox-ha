@@ -1,0 +1,112 @@
+name: CI & Docs
+
+on:
+  push:
+    branches:
+      - main
+      - "**"
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    name: Build, lint and verify
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Compile Python sources
+        run: python -m compileall -q weather4lox-ha
+
+      - name: Validate YAML
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import yaml
+
+          path = Path("weather4lox-ha/config.yaml")
+          with path.open(encoding="utf-8") as f:
+              data = yaml.safe_load(f)
+          assert data["name"] == "Weather4Lox HA"
+          assert data["version"]
+          assert int(data["target_hours"]) == 181
+          assert set(data["arch"]) >= {"amd64", "aarch64", "armv7"}
+          print(f"Validated Weather4Lox HA {data['version']}")
+          PY
+
+      - name: Validate required files
+        run: |
+          test -f weather4lox-ha/Dockerfile
+          test -f weather4lox-ha/run.sh
+          test -f weather4lox-ha/server.py
+          test -f weather4lox-ha/icon.png
+          test -f weather4lox-ha/logo.png
+          test -f weather4lox-ha/loxone_pictos.json
+
+  docs:
+    name: Update documentation
+    needs: verify
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Update generated documentation
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          import yaml
+
+          config_path = Path("weather4lox-ha/config.yaml")
+          readme_path = Path("README.md")
+          config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+          version = str(config["version"])
+          hours = int(config["target_hours"])
+
+          if not readme_path.exists():
+              readme_path.write_text("# Weather4Lox HA\n\n", encoding="utf-8")
+
+          text = readme_path.read_text(encoding="utf-8")
+          block = (
+              "<!-- AUTO-GENERATED: ci-docs.yml -->\n"
+              f"Current version: **{version}**  \n"
+              f"Forecast target: **{hours} hours**  \n"
+              "<!-- END AUTO-GENERATED -->"
+          )
+          pattern = r"<!-- AUTO-GENERATED: ci-docs\.yml -->.*?<!-- END AUTO-GENERATED -->"
+          if re.search(pattern, text, flags=re.S):
+              text = re.sub(pattern, block, text, flags=re.S)
+          else:
+              text = text.rstrip() + "\n\n" + block + "\n"
+          readme_path.write_text(text, encoding="utf-8")
+          PY
+
+      - name: Commit documentation update
+        run: |
+          if git diff --quiet -- README.md; then
+            echo "Documentation is already up to date."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add README.md
+          git commit -m "docs: update generated project metadata"
+          git push
