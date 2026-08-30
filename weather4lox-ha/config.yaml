@@ -1,0 +1,41 @@
+name: Weather4Lox HA
+version: "0.1.0"
+slug: weather4lox-ha
+description: Loxone Weather Service emulator for Home Assistant OS (experimental)
+url: https://github.com/hagenbogner-prog/weather4lox-ha
+arch:
+  - amd64
+  - aarch64
+  - armv7
+startup: services
+boot: auto
+init: false
+homeassistant_api: true
+ports:
+  6066/tcp: 6066
+ports_description:
+  6066/tcp: Loxone Weather Service HTTP API
+options:
+  weather_entity: weather.openweathermap
+  temperature_sensor: sensor.openweathermap_temperatur
+  feels_like_sensor: sensor.openweathermap_gefuhlte_temperatur
+  humidity_sensor: sensor.openweathermap_luftfeuchtigkeit
+  pressure_sensor: sensor.openweathermap_druck
+  cloud_sensor: sensor.openweathermap_bewolkung
+  wind_speed_sensor: sensor.openweathermap_windgeschwindigkeit
+  wind_gust_sensor: sensor.openweathermap_windboengeschwindigkeit
+  wind_direction_sensor: sensor.openweathermap_windrichtung
+  rain_sensor: sensor.openweathermap_regenintensitat
+  snow_sensor: sensor.openweathermap_schneeintensitat
+schema:
+  weather_entity: str
+  temperature_sensor: str
+  feels_like_sensor: str
+  humidity_sensor: str
+  pressure_sensor: str
+  cloud_sensor: str
+  wind_speed_sensor: str
+  wind_gust_sensor: str
+  wind_direction_sensor: str
+  rain_sensor: str
+  snow_sensor: str
