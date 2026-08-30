@@ -1,5 +1,5 @@
 name: Weather4Lox HA
-version: "0.3.2"
+version: "0.3.3"
 slug: weather4lox-ha
 description: Loxone Gen 1 Weather Service emulator for Home Assistant OS
 url: https://github.com/hagenbogner-prog/weather4lox-ha
@@ -30,6 +30,8 @@ options:
   wind_direction_sensor: sensor.openweathermap_windrichtung
   rain_sensor: sensor.openweathermap_regenintensitat
   snow_sensor: sensor.openweathermap_schneeintensitat
+  country: Germany
+  timezone: Europe/Berlin
   target_hours: 181
   cache_ttl_minutes: 60
   fallback_to_cache: true
@@ -51,6 +53,8 @@ schema:
   wind_direction_sensor: str
   rain_sensor: str
   snow_sensor: str
+  country: str
+  timezone: str
   target_hours: int
   cache_ttl_minutes: int
   fallback_to_cache: bool
