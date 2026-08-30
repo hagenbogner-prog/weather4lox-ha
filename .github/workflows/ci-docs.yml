@@ -107,4 +107,4 @@ jobs:
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: 'docs: automatische Aktualisierung der Dokumentation [skip ci]'
-          file_pattern: 'README.md docs/**/*'
+          file_pattern: 'README.md'
