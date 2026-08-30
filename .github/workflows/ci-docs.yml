@@ -41,7 +41,7 @@ jobs:
           options = data.get('options', {})
 
           assert data['name'] == 'Weather4Lox HA'
-          assert data['version'] == '0.3.4'
+          assert data['version'] == '0.3.6'
           assert int(options['target_hours']) == 181
           assert set(data['arch']) >= {'amd64', 'aarch64', 'armv7'}
           print(f"Validated Weather4Lox HA {data['version']} ({options['target_hours']} hours)")
@@ -49,6 +49,7 @@ jobs:
           test -f weather4lox-ha/Dockerfile
           test -f weather4lox-ha/run.sh
           test -f weather4lox-ha/server.py
+          test -f weather4lox-ha/server_035.py
           test -f weather4lox-ha/icon.png
           test -f weather4lox-ha/logo.png
           test -f weather4lox-ha/loxone_pictos.json
