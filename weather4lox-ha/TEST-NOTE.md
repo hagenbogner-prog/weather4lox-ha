@@ -1,0 +1,1 @@
+Current test status: /health, /raw and /forecast are working. Before connecting the real Miniserver, the response structure will be validated against the documented Gen-1 Weather Service format, including separate longitude/latitude fields and the required hourly forecast rows.
