@@ -126,9 +126,7 @@ def snapshot():
     attrs = data.get("attributes", {})
     sensor_mode = provider == "openweathermap"
     return {
-        "provider": provider,
-        "entity": entity,
-        "state": data.get("state"),
+        "provider": provider, "entity": entity, "state": data.get("state"),
         "temperature": number(o.get("temperature_sensor")) if sensor_mode else attrs.get("temperature"),
         "feels_like": number(o.get("feels_like_sensor")) if sensor_mode else attrs.get("apparent_temperature"),
         "humidity": number(o.get("humidity_sensor")) if sensor_mode else attrs.get("humidity"),
@@ -170,11 +168,7 @@ def load_cache():
 
 def save_cache(provider, entity, forecast, source, fallback_count):
     global cache
-    payload = {
-        "fetched_at": datetime.now(timezone.utc).isoformat(),
-        "provider": provider, "entity": entity, "source": source,
-        "fallback_count": fallback_count, "forecast": forecast,
-    }
+    payload = {"fetched_at": datetime.now(timezone.utc).isoformat(), "provider": provider, "entity": entity, "source": source, "fallback_count": fallback_count, "forecast": forecast}
     tmp = CACHE_FILE + ".tmp"
     with lock:
         try:
@@ -196,7 +190,9 @@ def cache_age_minutes(c):
     return max(0.0, (datetime.now(timezone.utc) - dt.astimezone(timezone.utc)).total_seconds() / 60)
 
 
-def cache_fresh(c):
+def cache_fresh(c, provider, entity):
+    if not c or c.get("provider") != provider or c.get("entity") != entity:
+        return False
     age = cache_age_minutes(c)
     return age is not None and age <= max(1, int(opts().get("cache_ttl_minutes", 60)))
 
@@ -229,21 +225,16 @@ def normalize(hourly, daily, target):
     result = []
     fallback_count = 0
     fields = ["temperature", "apparent_temperature", "humidity", "pressure", "wind_speed", "wind_gust_speed", "wind_bearing", "cloud_coverage", "precipitation", "precipitation_probability", "uv_index", "visibility"]
-
     for key in keys:
         if key in hourly_map:
-            item = dict(hourly_map[key])
-            item["_source"] = "hourly"
-            result.append(item)
-            continue
+            item = dict(hourly_map[key]); item["_source"] = "hourly"; result.append(item); continue
         item = None
         before = next((k for k in reversed(known) if k < key), None)
         after = next((k for k in known if k > key), None)
         if before and after and opts().get("interpolate_missing_hours", True):
             left, right = hourly_map[before], hourly_map[after]
             ratio = (key - before).total_seconds() / (after - before).total_seconds()
-            item = dict(left)
-            item["datetime"] = key.isoformat()
+            item = dict(left); item["datetime"] = key.isoformat()
             for field in fields:
                 if field in left or field in right:
                     item[field] = interpolate(left.get(field), right.get(field), ratio)
@@ -252,40 +243,30 @@ def normalize(hourly, daily, target):
         else:
             day = daily_map.get(key.date())
             if day:
-                item = dict(day)
-                item["datetime"] = key.isoformat()
+                item = dict(day); item["datetime"] = key.isoformat()
                 for field in fields:
-                    if field in day:
-                        item[field] = daily_value(day, field)
+                    if field in day: item[field] = daily_value(day, field)
                 item["apparent_temperature"] = daily_value(day, "apparent_temperature", item.get("temperature"))
                 item["_source"] = "daily_fallback"
         if item is None and result:
-            item = dict(result[-1])
-            item["datetime"] = key.isoformat()
-            item["_source"] = "last_value_fallback"
+            item = dict(result[-1]); item["datetime"] = key.isoformat(); item["_source"] = "last_value_fallback"
         if item is not None:
-            result.append(item)
-            fallback_count += 1
+            result.append(item); fallback_count += 1
     sources = {x.get("_source") for x in result}
     source = "hourly"
-    if "daily_fallback" in sources:
-        source = "hourly+daily"
-    if "last_value_fallback" in sources:
-        source = "hourly+daily+last_value"
-    if "interpolated" in sources and source == "hourly":
-        source = "hourly+interpolated"
-    return result, fallback_count, source
+    if "daily_fallback" in sources: source = "hourly+daily"
+    if "last_value_fallback" in sources: source = "hourly+daily+last_value"
+    if "interpolated" in sources and source == "hourly": source = "hourly+interpolated"
+    return result[:target], fallback_count, source
 
 
 def synthetic(existing, target, snap):
     result = sorted([dict(x) for x in existing], key=lambda x: parse_dt(x.get("datetime")) or datetime.min.replace(tzinfo=timezone.utc))
     original_count = len(result)
     if result:
-        last_dt = parse_dt(result[-1]["datetime"])
-        last = result[-1]
+        last_dt = parse_dt(result[-1]["datetime"]); last = result[-1]
     else:
-        last_dt = datetime.now().astimezone().replace(minute=0, second=0, microsecond=0)
-        last = {}
+        last_dt = datetime.now().astimezone().replace(minute=0, second=0, microsecond=0); last = {}
     base = {
         "temperature": safe_float(last.get("temperature"), safe_float(snap.get("temperature"), 15)),
         "feels": safe_float(last.get("apparent_temperature"), safe_float(snap.get("feels_like"), 15)),
@@ -310,56 +291,64 @@ def synthetic(existing, target, snap):
         bearing = (base["bearing"] + 15 * math.sin(n / 11)) % 360
         clouds = clamp(base["clouds"] + 15 * math.sin(n / 13), 0, 100)
         result.append({
-            "datetime": next_dt.isoformat(),
-            "temperature": round(temp, 2),
+            "datetime": next_dt.isoformat(), "temperature": round(temp, 2),
             "apparent_temperature": round(base["feels"] + (temp - base["temperature"]) * 0.9, 2),
             "humidity": round(humidity, 1), "pressure": round(pressure, 1),
             "wind_speed": round(wind, 2), "wind_gust_speed": round(gust, 2),
             "wind_bearing": round(bearing, 1), "cloud_coverage": round(clouds, 1),
             "precipitation": 0.0, "precipitation_probability": 0.0,
-            "uv_index": 0.0, "visibility": 10.0, "condition": condition,
-            "_source": "synthetic",
+            "uv_index": 0.0, "visibility": 10.0, "condition": condition, "_source": "synthetic",
         })
         next_dt += timedelta(hours=1)
-    return result[:target], len(result[:target]) - original_count
+    return result[:target], max(0, len(result[:target]) - original_count)
 
 
 def obtain_forecast(force=False):
     global last_error
-    o = opts()
-    provider = o.get("weather_provider", "openweathermap")
-    entity = selected_entity(o)
+    o = opts(); provider = o.get("weather_provider", "openweathermap"); entity = selected_entity(o)
     target = max(1, int(o.get("target_hours", TARGET_DEFAULT)))
     c = load_cache()
-    if c and cache_fresh(c) and not force:
+    if c and cache_fresh(c, provider, entity) and not force:
+        log.info("Using fresh cache: provider=%s entity=%s entries=%d", provider, entity, len(c.get("forecast", [])))
         return c.get("forecast", [])[:target], "cache", int(c.get("fallback_count", 0))
 
-    hourly, daily = [], []
-    error = None
+    hourly, daily, error = [], [], None
     try:
         log.info("Requesting hourly forecast: provider=%s entity=%s", provider, entity)
         hourly = service_forecast(entity, "hourly")
         log.info("Home Assistant returned %d hourly entries", len(hourly))
     except Exception as exc:
-        error = str(exc)
-        last_error = error
+        error = str(exc); last_error = error
         log.warning("Hourly forecast failed: %s", exc)
 
-    if len(hourly) < target:
+    # OpenWeatherMap is intentionally different: if it cannot provide the full
+    # 181-hour forecast, do not turn seven daily values into 181 repeated hours.
+    # We keep the real hourly part (if any) and synthetically continue it.
+    if provider != "openweathermap" and len(hourly) < target:
         try:
             daily = service_forecast(entity, "daily")
             log.info("Home Assistant returned %d daily entries", len(daily))
         except Exception as exc:
             log.warning("Daily forecast failed: %s", exc)
 
-    result, fallback_count, source = normalize(hourly, daily, target)
-    if len(result) < target and o.get("synthetic_fallback", True):
-        result, synthetic_count = synthetic(result, target, snapshot())
-        fallback_count += synthetic_count
-        source = (source + "+synthetic") if source != "none" else "synthetic"
-        log.warning("Synthetic fallback: %d entries generated", synthetic_count)
+    if provider == "openweathermap" and len(hourly) < target:
+        result = list(hourly)
+        fallback_count = 0
+        source = "hourly"
+        if o.get("synthetic_fallback", True):
+            result, synthetic_count = synthetic(result, target, snapshot())
+            fallback_count += synthetic_count
+            source = "hourly+synthetic" if hourly else "synthetic"
+            log.warning("OpenWeatherMap forecast shorter than %d: generated %d synthetic entries", target, synthetic_count)
+    else:
+        result, fallback_count, source = normalize(hourly, daily, target)
+        if len(result) < target and o.get("synthetic_fallback", True):
+            result, synthetic_count = synthetic(result, target, snapshot())
+            fallback_count += synthetic_count
+            source = (source + "+synthetic") if source != "none" else "synthetic"
+            log.warning("Synthetic fallback: generated %d entries", synthetic_count)
 
-    if len(result) < target and o.get("fallback_to_cache", True) and c:
+    if len(result) < target and o.get("fallback_to_cache", True) and c and c.get("provider") == provider and c.get("entity") == entity:
         cached = c.get("forecast", [])[:target]
         if len(cached) >= target:
             result, source, fallback_count = cached, "cache", int(c.get("fallback_count", 0))
@@ -373,12 +362,7 @@ def obtain_forecast(force=False):
 
 
 def condition_picto(condition):
-    return {
-        "sunny": 1, "clear-night": 1, "partlycloudy": 7, "cloudy": 22,
-        "fog": 16, "rainy": 23, "pouring": 25, "snowy": 24,
-        "snowy-rainy": 35, "lightning": 27, "lightning-rainy": 28,
-        "hail": 32, "windy": 19, "windy-variant": 20, "exceptional": 22,
-    }.get(str(condition or "").lower(), 22)
+    return {"sunny": 1, "clear-night": 1, "partlycloudy": 7, "cloudy": 22, "fog": 16, "rainy": 23, "pouring": 25, "snowy": 24, "snowy-rainy": 35, "lightning": 27, "lightning-rainy": 28, "hail": 32, "windy": 19, "windy-variant": 20, "exceptional": 22}.get(str(condition or "").lower(), 22)
 
 
 def picto(item):
@@ -393,29 +377,23 @@ def picto(item):
 
 def coord(value):
     try:
-        a, b = str(value).split(",", 1)
-        return float(a), float(b)
+        a, b = str(value).split(",", 1); return float(a), float(b)
     except (ValueError, TypeError):
         return 10.681, 48.56
 
 
 def fmt(value, digits=2, default="0"):
-    if value is None:
-        return default
+    if value is None: return default
     try:
         value = float(value)
-        if not math.isfinite(value):
-            return default
+        if not math.isfinite(value): return default
         return str(int(round(value))) if digits == 0 else f"{value:.{digits}f}"
-    except (TypeError, ValueError):
-        return default
+    except (TypeError, ValueError): return default
 
 
 def local_dt(value):
     dt = parse_dt(value)
-    if dt is None:
-        return datetime.now().astimezone()
-    return dt.astimezone()
+    return datetime.now().astimezone() if dt is None else dt.astimezone()
 
 
 def metadata():
@@ -424,65 +402,39 @@ def metadata():
 
 def make_loxone(query):
     global last_validation
-    o = opts()
-    provider = o.get("weather_provider", "openweathermap")
-    entity = selected_entity(o)
+    o = opts(); provider = o.get("weather_provider", "openweathermap"); entity = selected_entity(o)
     target = max(1, int(o.get("target_hours", TARGET_DEFAULT)))
-    user = query.get("user", ["loxone"])[0]
-    coord_text = query.get("coord", ["10.681,48.56"])[0]
-    asl = query.get("asl", ["450"])[0]
-    fmt_arg = query.get("format", ["2"])[0]
-    new_api = query.get("new_api", ["0"])[0]
+    user = query.get("user", ["loxone"])[0]; coord_text = query.get("coord", ["10.681,48.56"])[0]
+    asl = query.get("asl", ["450"])[0]; fmt_arg = query.get("format", ["2"])[0]; new_api = query.get("new_api", ["0"])[0]
     lon, lat = coord(coord_text)
     log.info("Loxone request: user=%s coord=%s asl=%s format=%s new_api=%s provider=%s entity=%s", user, coord_text, asl, fmt_arg, new_api, provider, entity)
-    snap = snapshot()
-    forecast, source, fallback_count = obtain_forecast()
+    snap = snapshot(); forecast, source, fallback_count = obtain_forecast()
     rows = []
     for index, item in enumerate(forecast[:target]):
         dt = local_dt(item.get("datetime"))
         clouds = clamp(safe_float(item.get("cloud_coverage"), safe_float(snap.get("clouds"))), 0, 100)
-        precipitation = max(0, safe_float(item.get("precipitation"), 0))
-        probability = clamp(safe_float(item.get("precipitation_probability"), 0), 0, 100)
-        snow = max(0, safe_float(item.get("snow"), 0))
-        snow_fraction = snow / precipitation if precipitation > 0 else 0
+        precipitation = max(0, safe_float(item.get("precipitation"), 0)); probability = clamp(safe_float(item.get("precipitation_probability"), 0), 0, 100)
+        snow = max(0, safe_float(item.get("snow"), 0)); snow_fraction = snow / precipitation if precipitation > 0 else 0
         row = [
-            str(index), "Home Assistant", fmt(lon, 3), fmt(lat, 3), str(asl),
-            o.get("country", "Germany"), o.get("timezone", "Europe/Berlin"), "0", "", "",
-            dt.strftime("%Y-%m-%d"), dt.strftime("%a"), dt.strftime("%H:%M"),
-            fmt(item.get("temperature", snap.get("temperature")), 2),
-            fmt(item.get("apparent_temperature", snap.get("feels_like")), 2),
-            fmt(item.get("wind_speed", snap.get("wind_speed")), 2),
-            fmt(item.get("wind_bearing", snap.get("wind_direction")), 0),
-            fmt(item.get("wind_gust_speed", snap.get("wind_gust")), 2),
-            fmt(clouds, 0), "0", "0", fmt(precipitation, 2), fmt(probability, 0), fmt(snow_fraction, 2),
-            fmt(item.get("pressure", snap.get("pressure")), 1), fmt(item.get("humidity", snap.get("humidity")), 0),
+            str(index), "Home Assistant", fmt(lon, 3), fmt(lat, 3), str(asl), o.get("country", "Germany"), o.get("timezone", "Europe/Berlin"), "0", "", "",
+            dt.strftime("%Y-%m-%d"), dt.strftime("%a"), dt.strftime("%H:%M"), fmt(item.get("temperature", snap.get("temperature")), 2), fmt(item.get("apparent_temperature", snap.get("feels_like")), 2),
+            fmt(item.get("wind_speed", snap.get("wind_speed")), 2), fmt(item.get("wind_bearing", snap.get("wind_direction")), 0), fmt(item.get("wind_gust_speed", snap.get("wind_gust")), 2),
+            fmt(clouds, 0), "0", "0", fmt(precipitation, 2), fmt(probability, 0), fmt(snow_fraction, 2), fmt(item.get("pressure", snap.get("pressure")), 1), fmt(item.get("humidity", snap.get("humidity")), 0),
             fmt(item.get("cape"), 0), str(picto(item)), fmt(item.get("radiation"), 0),
         ]
-        if len(row) != COLUMNS:
-            raise RuntimeError(f"Row {index} has {len(row)} columns, expected {COLUMNS}")
+        if len(row) != COLUMNS: raise RuntimeError(f"Row {index} has {len(row)} columns, expected {COLUMNS}")
         rows.append(";".join(row))
-
-    head = metadata()
-    counts = [len(row.split(";")) for row in rows]
-    invalid = []
+    head = metadata(); counts = [len(row.split(";")) for row in rows]; invalid = []
     for i, row in enumerate(rows):
         try:
             p = int(row.split(";")[27])
-            if p not in VALID_PICTOS:
-                invalid.append({"row": i, "picto": p})
-        except (ValueError, IndexError):
-            invalid.append({"row": i, "picto": None})
-    last_validation = {
-        "header_columns": len(head.split(";")), "expected_columns": COLUMNS,
-        "rows": len(rows), "expected_rows": target,
-        "row_columns_min": min(counts) if counts else 0, "row_columns_max": max(counts) if counts else 0,
-        "invalid_pictos": invalid, "source": source, "fallback_count": fallback_count,
-        "provider": provider, "entity": entity, "format": fmt_arg, "new_api": new_api,
-    }
+            if p not in VALID_PICTOS: invalid.append({"row": i, "picto": p})
+        except (ValueError, IndexError): invalid.append({"row": i, "picto": None})
+    last_validation = {"header_columns": len(head.split(";")), "expected_columns": COLUMNS, "rows": len(rows), "expected_rows": target, "row_columns_min": min(counts) if counts else 0, "row_columns_max": max(counts) if counts else 0, "invalid_pictos": invalid, "source": source, "fallback_count": fallback_count, "provider": provider, "entity": entity, "format": fmt_arg, "new_api": new_api}
     log.info("Loxone validation: rows=%d/%d columns=%d/%d row_columns=%d-%d invalid_pictos=%d source=%s fallback=%d", len(rows), target, len(head.split(";")), COLUMNS, min(counts) if counts else 0, max(counts) if counts else 0, len(invalid), source, fallback_count)
     if len(rows) != target or len(head.split(";")) != COLUMNS or any(c != COLUMNS for c in counts) or invalid:
         raise RuntimeError("Loxone response validation failed: " + json.dumps(last_validation, ensure_ascii=False))
-    valid_until = local_dt(forecast[-1].get("datetime")).strftime("%Y-%m-%d") if forecast else datetime.now().astimezone().strftime("%Y-%m-%d")
+    valid_until = local_dt(forecast[-1].get("datetime")).strftime("%Y-%m-%d")
     return "<mb_metadata>\n" + head + "\n</mb_metadata>\n\n<valid_until>" + valid_until + "</valid_until>\n\n<station>\n" + "\n".join(rows) + "\n</station>\n"
 
 
@@ -493,54 +445,30 @@ def forecast_json(force=False):
 
 class Handler(BaseHTTPRequestHandler):
     server_version = f"Weather4LoxHA/{VERSION}"
-
-    def log_message(self, fmt_text, *args):
-        debug("HTTP %s - " + fmt_text, self.address_string(), *args)
-
+    def log_message(self, fmt_text, *args): debug("HTTP %s - " + fmt_text, self.address_string(), *args)
     def reply(self, body, status=200, content_type="text/plain; charset=utf-8"):
-        data = body.encode("utf-8")
-        self.send_response(status)
-        self.send_header("Content-Type", content_type)
-        self.send_header("Content-Length", str(len(data)))
-        self.send_header("Cache-Control", "no-store")
-        self.end_headers()
-        self.wfile.write(data)
-
-    def json(self, obj, status=200):
-        self.reply(json.dumps(obj, ensure_ascii=False, indent=2, default=str), status, "application/json; charset=utf-8")
-
+        data = body.encode("utf-8"); self.send_response(status); self.send_header("Content-Type", content_type); self.send_header("Content-Length", str(len(data))); self.send_header("Cache-Control", "no-store"); self.end_headers(); self.wfile.write(data)
+    def json(self, obj, status=200): self.reply(json.dumps(obj, ensure_ascii=False, indent=2, default=str), status, "application/json; charset=utf-8")
     def do_GET(self):
         global request_count, last_request
-        request_count += 1
-        parsed = urlparse(self.path)
-        query = parse_qs(parsed.query)
-        last_request = {"path": parsed.path, "query": query, "time": datetime.now(timezone.utc).isoformat()}
+        request_count += 1; parsed = urlparse(self.path); query = parse_qs(parsed.query); last_request = {"path": parsed.path, "query": query, "time": datetime.now(timezone.utc).isoformat()}
         try:
-            if parsed.path == "/health":
-                self.reply(f"lox-weather-ha-test: OK (v{VERSION})\n")
+            if parsed.path == "/health": self.reply(f"lox-weather-ha-test: OK (v{VERSION})\n")
             elif parsed.path == "/status":
-                c = load_cache()
-                self.json({"version": VERSION, "provider": opts().get("weather_provider"), "entity": selected_entity(), "cache_age_minutes": cache_age_minutes(c), "cache_entries": len(c.get("forecast", [])) if c else 0, "last_error": last_error, "request_count": request_count, "last_request": last_request, "last_validation": last_validation})
+                c = load_cache(); self.json({"version": VERSION, "provider": opts().get("weather_provider"), "entity": selected_entity(), "cache_age_minutes": cache_age_minutes(c), "cache_entries": len(c.get("forecast", [])) if c else 0, "last_error": last_error, "request_count": request_count, "last_request": last_request, "last_validation": last_validation})
             elif parsed.path == "/raw":
-                s = snapshot()
-                self.json({k: s.get(k) for k in ("entity", "state", "temperature", "feels_like", "humidity", "pressure", "clouds", "wind_speed", "wind_gust", "wind_direction", "rain", "snow", "raw_attributes")})
-            elif parsed.path == "/debug/forecast":
-                self.json(forecast_json(query.get("refresh", ["0"])[0] == "1"))
-            elif parsed.path.rstrip("/") in ("/debug/loxone", "/forecast"):
-                self.reply(make_loxone(query), content_type="application/xml; charset=utf-8")
-            else:
-                self.reply("Not found\n", 404)
+                s = snapshot(); self.json({k: s.get(k) for k in ("entity", "state", "temperature", "feels_like", "humidity", "pressure", "clouds", "wind_speed", "wind_gust", "wind_direction", "rain", "snow", "raw_attributes")})
+            elif parsed.path == "/debug/forecast": self.json(forecast_json(query.get("refresh", ["0"])[0] == "1"))
+            elif parsed.path.rstrip("/") in ("/debug/loxone", "/forecast"): self.reply(make_loxone(query), content_type="application/xml; charset=utf-8")
+            else: self.reply("Not found\n", 404)
         except Exception as exc:
-            log.exception("Request failed for %s", self.path)
-            self.reply(f"Internal Server Error: {exc}\n", 500)
+            log.exception("Request failed for %s", self.path); self.reply(f"Internal Server Error: {exc}\n", 500)
 
 
 def main():
     log.info("Weather4Lox HA %s starting on %s:%d", VERSION, HOST, PORT)
-    o = opts()
-    log.info("Config: provider=%s weather_entity=%s dwd_entity=%s target_hours=%s synthetic_fallback=%s debug_logging=%s", o.get("weather_provider"), o.get("weather_entity"), o.get("dwd_weather_entity"), o.get("target_hours", TARGET_DEFAULT), o.get("synthetic_fallback", True), o.get("debug_logging", True))
+    o = opts(); log.info("Config: provider=%s weather_entity=%s dwd_entity=%s target_hours=%s synthetic_fallback=%s debug_logging=%s", o.get("weather_provider"), o.get("weather_entity"), o.get("dwd_weather_entity"), o.get("target_hours", TARGET_DEFAULT), o.get("synthetic_fallback", True), o.get("debug_logging", True))
     ThreadingHTTPServer((HOST, PORT), Handler).serve_forever()
 
 
-if __name__ == "__main__":
-    main()
+if __name__ == "__main__": main()
