@@ -5,7 +5,7 @@ import os
 from datetime import datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
-from urllib.request import Request, urlopen
+from urllib.request import HTTPError, Request, urlopen
 
 HOST = "0.0.0.0"
 PORT = 6066
@@ -39,9 +39,14 @@ def ha_request(method, path, payload=None):
             "Content-Type": "application/json",
         },
     )
-    with urlopen(req, timeout=20) as response:
-        raw = response.read().decode("utf-8")
-        return json.loads(raw) if raw else {}
+    try:
+        with urlopen(req, timeout=20) as response:
+            raw = response.read().decode("utf-8")
+            return json.loads(raw) if raw else {}
+    except HTTPError as exc:
+        error_body = exc.read().decode("utf-8", errors="replace")
+        log.error("Home Assistant API returned HTTP %s for %s %s: %s", exc.code, method, path, error_body)
+        raise RuntimeError(f"Home Assistant API HTTP {exc.code}: {error_body}") from exc
 
 
 def ha_get(path):
@@ -111,9 +116,19 @@ def weather_snapshot():
 
 def get_hourly_forecast():
     o = options()
+    provider = o.get("weather_provider", "openweathermap")
     entity = selected_weather_entity(o)
-    log.info("Requesting hourly forecast from Home Assistant: %s", entity)
-    response = ha_service("weather", "get_forecasts", {"entity_id": entity, "type": "hourly"}, return_response=True)
+    log.info("Requesting hourly forecast from Home Assistant: provider=%s entity=%s", provider, entity)
+    try:
+        response = ha_service("weather", "get_forecasts", {"entity_id": entity, "type": "hourly"}, return_response=True)
+    except RuntimeError as exc:
+        if provider == "openweathermap":
+            log.error(
+                "OpenWeatherMap hourly forecast is not available through the selected Home Assistant weather entity. "
+                "This is expected with OWM modes that provide only 3-hour/5-day or daily/48-hour data. Error: %s", exc
+            )
+        raise
+
     service_response = response.get("service_response", {})
     entity_response = service_response.get(entity, {})
     forecast = entity_response.get("forecast", [])
@@ -126,7 +141,7 @@ def get_hourly_forecast():
     if len(forecast) < TARGET_HOURS:
         log.warning(
             "Only %d hourly forecast entries available; %d are required for the full seven-day Loxone report. "
-            "This may be caused by the weather provider/API plan.",
+            "This is a provider limitation unless additional data processing is implemented.",
             len(forecast), TARGET_HOURS,
         )
     return forecast[:TARGET_HOURS]
@@ -137,7 +152,7 @@ def parse_dt(value):
         return None
     try:
         return datetime.fromisoformat(value.replace("Z", "+00:00"))
-    except ValueError:
+    except (ValueError, TypeError):
         return None
 
 
@@ -262,7 +277,7 @@ def forecast_response(query):
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "Weather4LoxHA/0.2.0"
+    server_version = "Weather4LoxHA/0.2.1"
 
     def log_message(self, fmt, *args):
         log.info("HTTP %s - %s", self.address_string(), fmt % args)
