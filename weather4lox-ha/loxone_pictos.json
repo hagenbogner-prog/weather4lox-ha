@@ -1,0 +1,18 @@
+{
+  "sunny": 1,
+  "clear-night": 1,
+  "partlycloudy": 7,
+  "cloudy": 22,
+  "fog": 16,
+  "rainy": 23,
+  "pouring": 25,
+  "snowy": 24,
+  "snowy-rainy": 35,
+  "lightning": 27,
+  "lightning-rainy": 28,
+  "hail": 32,
+  "windy": 19,
+  "windy-variant": 20,
+  "exceptional": 22,
+  "_default": 22
+}
