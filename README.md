@@ -83,3 +83,8 @@ The result should point to the Home Assistant IP address.
 ## License
 
 MIT
+
+<!-- AUTO-GENERATED: ci-docs.yml -->
+Current version: **0.3.6**  
+Forecast target: **181 hours**  
+<!-- END AUTO-GENERATED -->
