@@ -32,13 +32,16 @@ jobs:
           python - <<'PY'
           from pathlib import Path
           import yaml
+
           config_path = Path('weather4lox-ha/config.yaml')
           data = yaml.safe_load(config_path.read_text(encoding='utf-8'))
+          options = data.get('options', {})
+
           assert data['name'] == 'Weather4Lox HA'
-          assert data['version']
-          assert int(data['target_hours']) == 181
+          assert data['version'] == '0.3.4'
+          assert int(options['target_hours']) == 181
           assert set(data['arch']) >= {'amd64', 'aarch64', 'armv7'}
-          print(f"Validated Weather4Lox HA {data['version']}")
+          print(f"Validated Weather4Lox HA {data['version']} ({options['target_hours']} hours)")
           PY
           test -f weather4lox-ha/Dockerfile
           test -f weather4lox-ha/run.sh
@@ -47,9 +50,27 @@ jobs:
           test -f weather4lox-ha/logo.png
           test -f weather4lox-ha/loxone_pictos.json
 
+      - name: Build Docker image
+        run: |
+          VERSION=$(python - <<'PY'
+          import yaml
+          print(yaml.safe_load(open('weather4lox-ha/config.yaml', encoding='utf-8'))['version'])
+          PY
+          )
+          docker build \
+            --build-arg BUILD_VERSION="$VERSION" \
+            --build-arg BUILD_ARCH=amd64 \
+            -t weather4lox-ha:test \
+            weather4lox-ha
+
       - name: Run tests if available
         run: |
-          if [ -d tests ]; then python -m pytest -q; else echo 'No tests directory; structural verification completed.'; fi
+          if [ -d tests ]; then
+            python -m pip install pytest
+            python -m pytest -q
+          else
+            echo 'No tests directory; structural and Docker build verification completed.'
+          fi
 
       - name: Generate Documentation
         run: |
@@ -57,9 +78,10 @@ jobs:
           from pathlib import Path
           import re
           import yaml
+
           config = yaml.safe_load(Path('weather4lox-ha/config.yaml').read_text(encoding='utf-8'))
           version = str(config['version'])
-          hours = int(config['target_hours'])
+          hours = int(config['options']['target_hours'])
           readme = Path('README.md')
           if not readme.exists():
               readme.write_text('# Weather4Lox HA\n\n', encoding='utf-8')
