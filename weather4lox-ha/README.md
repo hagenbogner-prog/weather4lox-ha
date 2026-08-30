@@ -1,21 +1,117 @@
-# Weather4Lox HA — test add-on
+# Weather4Lox HA — test add-on 0.3.0
 
-Experimental Home Assistant OS add-on that emulates the Loxone Gen-1 Weather Service on TCP port 6066.
+Home Assistant OS add-on that emulates the Loxone Gen-1 Weather Service on TCP port 6066.
 
-## Weather provider selection
+The project is being developed as a replacement for the LoxBerry Weather4Loxone setup. The implementation deliberately keeps a strong diagnostic focus so the real Miniserver can be tested safely before production use.
 
-The add-on can use either of the two weather integrations already present in the user's Home Assistant setup:
+## Provider selection
 
-- `openweathermap` → `weather.openweathermap` plus the dedicated OpenWeatherMap sensor entities
+The add-on supports three modes:
+
+- `openweathermap` → `weather.openweathermap` plus the configured OpenWeatherMap sensor entities
 - `dwd` → `weather.wertingen`
+- `custom` → any Home Assistant `weather.*` entity configured as `custom_weather_entity`
 
-The selection is made in the add-on configuration via **Weather provider**. The selected entity is used for both current conditions and the hourly forecast.
+The selected provider is used for current conditions and forecast retrieval.
 
-## Seven-day hourly forecast
+## Forecast engine
 
-For every `/forecast/` request the add-on calls Home Assistant's `weather.get_forecasts` service with `type: hourly` and requests the response data through the Home Assistant API. The Loxone-compatible response contains up to 181 hourly entries, matching the roughly seven-day report expected by a Loxone Miniserver Gen 1.
+The add-on requests Home Assistant's `weather.get_forecasts` service for `hourly` data and, when the hourly result is shorter than the configured target, also requests `daily` data.
 
-If the selected weather integration provides fewer than 181 hourly entries, the add-on does **not** invent missing weather data. It logs a warning with the number of available entries. This is important because forecast length depends on the underlying weather integration and, for some providers, the API plan.
+The forecast normalizer creates a one-hour grid:
+
+1. Real hourly values are used unchanged.
+2. Gaps between real hourly values can be linearly interpolated when `interpolate_missing_hours` is enabled.
+3. When hourly data ends early, daily data is used as a clearly marked fallback.
+4. If the provider temporarily fails, the last cached forecast can be served.
+
+The default target is 168 hourly data points (7 x 24). The target is configurable up to 240 hours.
+
+## Cache
+
+Forecast data is cached in the add-on `/data` directory so it survives a restart. The default cache TTL is 60 minutes. This prevents every Loxone request from triggering a new Home Assistant forecast request.
+
+Configuration:
+
+```yaml
+cache_ttl_minutes: 60
+fallback_to_cache: true
+```
+
+## Diagnostics
+
+### Health
+
+```text
+http://HOME_ASSISTANT_IP:6066/health
+```
+
+### Status
+
+```text
+http://HOME_ASSISTANT_IP:6066/status
+```
+
+Shows provider, entity, cache age, number of forecast entries, last error and request statistics.
+
+### Current HA weather data
+
+```text
+http://HOME_ASSISTANT_IP:6066/raw
+```
+
+### Forecast data from HA / normalized forecast
+
+```text
+http://HOME_ASSISTANT_IP:6066/debug/forecast
+```
+
+Use `?refresh=1` to bypass the fresh cache for a diagnostic request.
+
+### Exact Loxone response
+
+```text
+http://HOME_ASSISTANT_IP:6066/debug/loxone/?user=test&coord=10.681,48.56&asl=450&format=1
+```
+
+`/forecast/` is the same Loxone response endpoint.
+
+## Loxone compatibility
+
+The response follows the documented Weather4Lox / Meteoblue-style XML/CSV structure:
+
+- `<mb_metadata>` header
+- semicolon-separated station columns
+- `<valid_until>`
+- `<station>` with hourly rows
+- 29 data columns
+- valid Meteoblue/Loxone `picto-code` values
+- explicit trailing semicolons
+
+The icon mapping is kept separately in `loxone_pictos.json` so it can be maintained independently of the server code.
+
+## Configuration example
+
+OpenWeatherMap:
+
+```yaml
+weather_provider: openweathermap
+weather_entity: weather.openweathermap
+```
+
+DWD:
+
+```yaml
+weather_provider: dwd
+dwd_weather_entity: weather.wertingen
+```
+
+Custom HA weather entity:
+
+```yaml
+weather_provider: custom
+custom_weather_entity: weather.my_provider
+```
 
 ## Installation
 
@@ -25,66 +121,30 @@ Add the GitHub repository to Home Assistant's add-on/app repository list:
 
 Install **Weather4Lox HA** and start it.
 
-## Configuration
-
-Default provider:
-
-```yaml
-weather_provider: openweathermap
-```
-
-OpenWeatherMap entities are preconfigured for the entities used in the original test setup. The DWD entity defaults to:
-
-```yaml
-dwd_weather_entity: weather.wertingen
-```
-
-Change **Weather provider** to `dwd` when you want to use the DWD integration instead.
-
-## First tests
+## First test sequence
 
 From another device on the LAN:
 
 ```bash
 curl http://192.168.178.158:6066/health
-```
-
-Expected:
-
-```text
-lox-weather-ha-test: OK
-```
-
-Inspect the current weather data:
-
-```bash
+curl http://192.168.178.158:6066/status
 curl http://192.168.178.158:6066/raw
-```
-
-Inspect the hourly forecast returned by Home Assistant:
-
-```bash
 curl http://192.168.178.158:6066/debug/forecast
+curl "http://192.168.178.158:6066/debug/loxone/?user=loxone_TEST&coord=10.681,48.56&asl=450&format=1"
 ```
 
-Finally simulate a Loxone request:
-
-```bash
-curl "http://192.168.178.158:6066/forecast/?user=loxone_TEST&coord=10.681,48.56&asl=450&format=2&new_api=1"
-```
-
-## DNS test
+DNS:
 
 ```bash
 nslookup weather.loxone.com
 ```
 
-It should resolve to the Home Assistant IP.
+The result should point to the Home Assistant IP.
 
 ## Logging
 
-Open the add-on log in Home Assistant. Each request is logged, including the Loxone query parameters, selected weather provider, Home Assistant forecast entity, number of hourly forecast entries and generated response size.
+With `debug_logging: true`, the add-on logs request parameters, provider/entity selection, forecast counts, cache usage, interpolation/fallback counts and response size. Debug logging can be disabled after compatibility testing.
 
 ## Important
 
-This is still a compatibility test build, not a production Weather4Lox replacement. Exact Gen-1 response compatibility and the available forecast length of each weather integration need to be verified with the real Miniserver.
+This is a compatibility test build. The real Gen-1 Miniserver must be used to validate the final response. Do not remove the old LoxBerry setup until the Miniserver has successfully accepted the new service over several update cycles.
