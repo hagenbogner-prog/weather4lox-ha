@@ -1,5 +1,5 @@
 name: Weather4Lox HA
-version: "0.3.0"
+version: "0.3.1"
 slug: weather4lox-ha
 description: Loxone Gen 1 Weather Service emulator for Home Assistant OS
 url: https://github.com/hagenbogner-prog/weather4lox-ha
@@ -35,8 +35,6 @@ options:
   fallback_to_cache: true
   interpolate_missing_hours: true
   debug_logging: true
-  country: Germany
-  timezone: Europe/Berlin
 schema:
   weather_provider: list(openweathermap|dwd|custom)
   weather_entity: str
@@ -57,5 +55,3 @@ schema:
   fallback_to_cache: bool
   interpolate_missing_hours: bool
   debug_logging: bool
-  country: str
-  timezone: str
