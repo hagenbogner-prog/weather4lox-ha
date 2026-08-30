@@ -4,11 +4,15 @@
 Keeps the stable 0.3.4 core but normalizes the Home Assistant weather
 response to the units and field semantics expected by the Loxone Gen 1
 weather protocol.
+
+Important: the protocol's ``picto-code`` is the documented Loxone weather
+code (1..29).  The 30..35 values used by the old LoxBerry weather emulator
+are NOT valid protocol values and can make the Loxone client fail while
+resolving its weather icon.
 """
 import math
 import os
 import sys
-from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(__file__))
 import server as core
@@ -16,6 +20,28 @@ import server as core
 VERSION = "0.3.5"
 core.VERSION = VERSION
 core.Handler.server_version = f"Weather4LoxHA/{VERSION}"
+
+# Documented Loxone Gen 1 weather-service codes.
+# These are deliberately kept separate from the Weather4Lox emulator codes.
+LOXONE_PICTOS = {
+    "sunny": 1,
+    "clear-night": 1,
+    "partlycloudy": 3,
+    "cloudy": 5,
+    "fog": 6,
+    "rainy": 11,
+    "pouring": 12,
+    "snowy": 21,
+    "snowy-rainy": 26,
+    "lightning": 18,
+    "lightning-rainy": 19,
+    "hail": 23,
+    "windy": 4,
+    "windy-variant": 4,
+    "exceptional": 5,
+}
+VALID_LOXONE_PICTOS = set(range(1, 30))
+DEFAULT_LOXONE_PICTO = 5
 
 
 def as_float(value, default=0.0):
@@ -65,7 +91,7 @@ def pressure_hpa(value, unit):
         return value * 33.8638866667
     if unit in {"mmhg", "mm hg"}:
         return value * 1.33322387415
-    if unit in {"bar"}:
+    if unit == "bar":
         return value * 1000
     return value
 
@@ -81,6 +107,24 @@ def precipitation_mm(value, unit):
 def timezone_offset_hours(dt):
     offset = dt.utcoffset()
     return 0 if offset is None else int(offset.total_seconds() / 3600)
+
+
+def loxone_picto(item):
+    """Return a protocol-safe Loxone picto code, never an emulator code."""
+    condition = str(item.get("condition") or "").lower()
+    mapped = LOXONE_PICTOS.get(condition)
+    if mapped in VALID_LOXONE_PICTOS:
+        return mapped
+
+    # A supplied picto-code may already be a documented Loxone code.
+    try:
+        supplied = int(item.get("picto-code"))
+        if supplied in VALID_LOXONE_PICTOS:
+            return supplied
+    except (TypeError, ValueError):
+        pass
+
+    return DEFAULT_LOXONE_PICTO
 
 
 def enhanced_build_rows(forecast, query, diagnostic=False):
@@ -104,7 +148,11 @@ def enhanced_build_rows(forecast, query, diagnostic=False):
 
     for index, item in enumerate(forecast):
         dt = core.local_dt(item.get("datetime"))
-        clouds = core.clamp(core.safe_float(item.get("cloud_coverage"), core.safe_float(snap.get("clouds"))), 0, 100)
+        clouds = core.clamp(
+            core.safe_float(item.get("cloud_coverage"), core.safe_float(snap.get("clouds"))),
+            0,
+            100,
+        )
         precipitation = max(0, precipitation_mm(item.get("precipitation"), precipitation_unit))
         probability = core.clamp(core.safe_float(item.get("precipitation_probability"), 0), 0, 100)
         snow = max(0, precipitation_mm(item.get("snow"), precipitation_unit))
@@ -117,7 +165,6 @@ def enhanced_build_rows(forecast, query, diagnostic=False):
         pressure = pressure_hpa(item.get("pressure", snap.get("pressure")), pressure_unit)
         humidity = core.safe_float(item.get("humidity", snap.get("humidity")))
         radiation = item.get("radiation", item.get("solar_radiation", 0))
-        condition = item.get("condition")
 
         row = [
             str(index), "Home Assistant", core.fmt(lon, 3), core.fmt(lat, 3), str(asl),
@@ -128,7 +175,7 @@ def enhanced_build_rows(forecast, query, diagnostic=False):
             core.fmt(direction, 0), core.fmt(gust, 2), core.fmt(clouds, 0), "0", "0",
             core.fmt(precipitation, 2), core.fmt(probability, 0), core.fmt(snow_fraction, 2),
             core.fmt(pressure, 1), core.fmt(humidity, 0), core.fmt(item.get("cape"), 0),
-            str(core.DIAGNOSTIC_PICTO if diagnostic else core.picto(item)), core.fmt(radiation, 0),
+            str(core.DIAGNOSTIC_PICTO if diagnostic else loxone_picto(item)), core.fmt(radiation, 0),
         ]
         if len(row) != core.COLUMNS:
             raise RuntimeError(f"Row {index} has {len(row)} columns, expected {core.COLUMNS}")
@@ -136,7 +183,10 @@ def enhanced_build_rows(forecast, query, diagnostic=False):
     return rows
 
 
+# The core validator must use the protocol range, not the emulator's 1..35 range.
+core.VALID_PICTOS = VALID_LOXONE_PICTOS
 core.build_rows = enhanced_build_rows
+
 
 if __name__ == "__main__":
     core.main()
