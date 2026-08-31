@@ -28,7 +28,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install pyyaml
-          python -m compileall -q weather4lox-ha
+          python -m compileall -q weather4lox-ha tests
 
       - name: Verify Code & Add-on
         run: |
@@ -41,8 +41,11 @@ jobs:
           options = data.get('options', {})
 
           assert data['name'] == 'Weather4Lox HA'
-          assert data['version'] == '0.3.6'
+          assert data['version'] == '0.3.7'
           assert int(options['target_hours']) == 181
+          assert options['location_city'] == 'Wertingen'
+          assert float(options['latitude']) == 48.56
+          assert float(options['longitude']) == 10.681
           assert set(data['arch']) >= {'amd64', 'aarch64', 'armv7'}
           print(f"Validated Weather4Lox HA {data['version']} ({options['target_hours']} hours)")
           PY
@@ -50,6 +53,7 @@ jobs:
           test -f weather4lox-ha/run.sh
           test -f weather4lox-ha/server.py
           test -f weather4lox-ha/server_035.py
+          test -f weather4lox-ha/live_data.py
           test -f weather4lox-ha/icon.png
           test -f weather4lox-ha/logo.png
           test -f weather4lox-ha/loxone_pictos.json
