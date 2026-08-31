@@ -88,3 +88,8 @@ MIT
 Current version: **0.3.6**  
 Forecast target: **181 hours**  
 <!-- END AUTO-GENERATED -->
+
+<!-- AUTO-GENERATED: ci-docs.yml -->
+Current version: **0.3.7**  
+Forecast target: **181 hours**  
+<!-- END AUTO-GENERATED -->
