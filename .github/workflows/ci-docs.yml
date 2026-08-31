@@ -54,6 +54,7 @@ jobs:
           test -f weather4lox-ha/server.py
           test -f weather4lox-ha/server_035.py
           test -f weather4lox-ha/live_data.py
+          test -f weather4lox-ha/bootstrap.py
           test -f weather4lox-ha/icon.png
           test -f weather4lox-ha/logo.png
           test -f weather4lox-ha/loxone_pictos.json
@@ -98,10 +99,9 @@ jobs:
                    f'Current version: **{version}**  \n'
                    f'Forecast target: **{hours} hours**  \n'
                    '<!-- END AUTO-GENERATED -->')
-          pattern = r'<!-- AUTO-GENERATED: ci-docs\\.yml -->.*?<!-- END AUTO-GENERATED -->'
-          if re.search(pattern, text, flags=re.S):
-              text = re.sub(pattern, block, text, flags=re.S)
-          else:
+          pattern = r'<!-- AUTO-GENERATED: ci-docs\.yml -->.*?<!-- END AUTO-GENERATED -->'
+          text = re.sub(pattern, block, text, flags=re.S)
+          if block not in text:
               text = text.rstrip() + '\n\n' + block + '\n'
           readme.write_text(text, encoding='utf-8')
           PY
