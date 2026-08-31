@@ -2,9 +2,9 @@ name: Build, Verify & Auto-Documentation
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [main, master]
   pull_request:
-    branches: [ main, master ]
+    branches: [main, master]
 
 permissions:
   contents: write
@@ -24,47 +24,62 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install Dependencies & Build
+      - name: Install test dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install pyyaml
-          python -m compileall -q weather4lox-ha tests
+          python -m pip install pyyaml pytest
 
-      - name: Verify Code & Add-on
+      - name: Verify Home Assistant add-on tree
         run: |
+          test -f weather4lox-ha/config.yaml
+          test -f weather4lox-ha/Dockerfile
+          test -f weather4lox-ha/run.sh
+          test -f weather4lox-ha/bootstrap.py
+          test -f weather4lox-ha/server.py
+          test -f weather4lox-ha/server_035.py
+          test -f weather4lox-ha/loxone_format2.py
+          test -f weather4lox-ha/protocol/loxone_gen1.py
+          test -f weather4lox-ha/icon.png
+          test -f weather4lox-ha/logo.png
+          test -f repository.yaml
+          test -z "$(find . -type f -name '*.zip' -print -quit)"
+          test ! -e weather4lox-ha/live_data.py
+          test ! -e weather4lox-ha/json_compat.py
+          test ! -e weather4lox-ha/loxone_pictos.json
+          test ! -e tests/test_live_data.py
+          test ! -e tests/test_json_compat.py
+          test ! -e weather4lox-ha/0.3.4_STATUS.md
+          test ! -e weather4lox-ha/0.3.5_STATUS.md
+          test ! -e weather4lox-ha/DIAGNOSTIC_0.3.4.md
+          test ! -e weather4lox-ha/PROTOCOL-TEST.md
+          test ! -e weather4lox-ha/TEST-NOTE.md
+          test ! -e weather4lox-ha/README.tmp
+          test ! -e weather4lox-ha/_cleanup_marker.txt
+          test ! -e weather4lox-ha/DELETE_ME
+          test ! -e weather4lox-ha/DELETE_ME_TOO
+          test ! -e weather4lox-ha/DELETE_ME_THREE
+          test ! -e weather4lox-ha/DELETE_ME_FOUR
+
+      - name: Validate configuration and Python sources
+        run: |
+          python -m compileall -q weather4lox-ha tests
           python - <<'PY'
           from pathlib import Path
           import yaml
 
-          config_path = Path('weather4lox-ha/config.yaml')
-          data = yaml.safe_load(config_path.read_text(encoding='utf-8'))
-          options = data.get('options', {})
-
-          assert data['name'] == 'Weather4Lox HA'
-          assert data['version'] == '0.4.0'
-          assert int(options['target_hours']) == 181
-          assert options['location_city'] == 'Wertingen'
-          assert float(options['latitude']) == 48.56
-          assert float(options['longitude']) == 10.681
-          assert set(data['arch']) >= {'amd64', 'aarch64', 'armv7'}
-          print(f"Validated Weather4Lox HA {data['version']} ({options['target_hours']} hours)")
+          config = yaml.safe_load(Path('weather4lox-ha/config.yaml').read_text(encoding='utf-8'))
+          assert config['name'] == 'Weather4Lox HA'
+          assert config['version'] == '0.4.1'
+          assert config['slug'] == 'weather4lox-ha'
+          assert config['ports']['6066/tcp'] == 6066
+          assert int(config['options']['target_hours']) == 181
+          assert config['options']['location_city'] == 'Wertingen'
+          assert float(config['options']['latitude']) == 48.56
+          assert float(config['options']['longitude']) == 10.681
+          print(f"Validated Weather4Lox HA {config['version']}")
           PY
-          test -f weather4lox-ha/Dockerfile
-          test -f weather4lox-ha/run.sh
-          test -f weather4lox-ha/server.py
-          test -f weather4lox-ha/server_035.py
-          test -f weather4lox-ha/live_data.py
-          test -f weather4lox-ha/json_compat.py
-          test -f weather4lox-ha/bootstrap.py
-          test -f weather4lox-ha/loxone_format2.py
-          test -f weather4lox-ha/protocol/__init__.py
-          test -f weather4lox-ha/protocol/loxone_gen1.py
-          test -f tests/test_loxone_format2_emulator.py
-          test -f weather4lox-ha/icon.png
-          test -f weather4lox-ha/logo.png
-          test -f weather4lox-ha/loxone_pictos.json
 
-      - name: Build Docker image
+      - name: Build Home Assistant add-on image
         run: |
           VERSION=$(python - <<'PY'
           import yaml
@@ -78,9 +93,7 @@ jobs:
             weather4lox-ha
 
       - name: Run tests
-        run: |
-          python -m pip install pytest
-          python -m pytest -q
+        run: python -m pytest -q
 
       - name: Generate Documentation
         run: |
@@ -93,8 +106,6 @@ jobs:
           version = str(config['version'])
           hours = int(config['options']['target_hours'])
           readme = Path('README.md')
-          if not readme.exists():
-              readme.write_text('# Weather4Lox HA\n\n', encoding='utf-8')
           text = readme.read_text(encoding='utf-8')
           block = ('<!-- AUTO-GENERATED: ci-docs.yml -->\n'
                    f'Current version: **{version}**  \n'
@@ -102,8 +113,6 @@ jobs:
                    '<!-- END AUTO-GENERATED -->')
           pattern = r'<!-- AUTO-GENERATED: ci-docs\\.yml -->.*?<!-- END AUTO-GENERATED -->'
           text = re.sub(pattern, block, text, flags=re.S)
-          if block not in text:
-              text = text.rstrip() + '\n\n' + block + '\n'
           readme.write_text(text, encoding='utf-8')
           PY
 
