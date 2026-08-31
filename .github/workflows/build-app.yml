@@ -1,0 +1,74 @@
+name: Build Home Assistant app
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    name: Python and configuration tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install test dependencies
+        run: python -m pip install --upgrade pytest pyyaml
+
+      - name: Compile sources
+        run: python -m compileall -q weather4lox-ha tests
+
+      - name: Run tests
+        run: python -m pytest -q
+
+  build:
+    name: Build ${{ matrix.arch }}
+    needs: tests
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [amd64, aarch64]
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Read app version
+        id: version
+        shell: bash
+        run: |
+          VERSION=$(python - <<'PY'
+          import yaml
+          print(yaml.safe_load(open('weather4lox-ha/config.yaml', encoding='utf-8'))['version'])
+          PY
+          )
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Build Home Assistant app image
+        uses: home-assistant/builder/actions/build-image@4de35182ce1e329181bffcbcc84d33db5e2c7e10
+        with:
+          arch: ${{ matrix.arch }}
+          image: ghcr.io/hagenbogner-prog/${{ matrix.arch }}-weather4lox-ha
+          image-tags: |
+            ${{ steps.version.outputs.version }}
+            latest
+          version: ${{ steps.version.outputs.version }}
+          push: ${{ github.event_name == 'release' }}
+          container-registry-password: ${{ secrets.GITHUB_TOKEN }}
