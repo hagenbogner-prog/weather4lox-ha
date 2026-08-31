@@ -42,7 +42,7 @@ options:
   cache_ttl_minutes: 60
   fallback_to_cache: true
   interpolate_missing_hours: true
-  synthetic_fallback: true
+  synthetic_fallback: false
   debug_logging: true
 schema:
   weather_provider: list(openweathermap|dwd|custom)
