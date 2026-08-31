@@ -1,119 +1,80 @@
 # Weather4Lox HA
 
-Home Assistant add-on providing a Loxone Weather Service compatible API on port 6066, replacing the LoxBerry Weather4Loxone plugin for Loxone Miniserver Gen 1.
+Home Assistant add-on that provides the Loxone Gen 1 Weather Service API on TCP port 6066. It reads weather data from Home Assistant and serves the `format=2` response expected by a Loxone Miniserver.
 
-> **Status:** Experimental / test version. The current release adds the LoxBerry-compatible JSON files needed by the live Weather4Lox client.
-
-## Goal
-
-This project provides a small HTTP service for Home Assistant OS that emulates the weather endpoint expected by a Loxone Miniserver Gen 1.
-
-The intended setup is:
+## Architecture
 
 ```text
 Loxone Miniserver Gen 1
         |
         | HTTP :6066
         v
-weather.loxone.com
-        |
-        v
-Home Assistant OS
-        |
-        v
 Weather4Lox HA add-on
         |
+        | Home Assistant Supervisor API
         v
-Home Assistant weather entity
+Home Assistant weather entity / sensors
 ```
 
-DNSMasq should resolve `weather.loxone.com` to the Home Assistant IP address.
+The add-on is a native Home Assistant add-on. It does not contain or install a LoxBerry plugin. Historical LoxBerry-only JSON endpoints and runtime files are intentionally not part of the add-on.
 
-## Live LoxBerry-compatible JSON data
+## Loxone endpoint
 
-The add-on now persists the three Weather4Lox v4 JSON files under:
+The main service endpoint is:
 
 ```text
-/data/weather4lox/current.json
-/data/weather4lox/dailyforecast.json
-/data/weather4lox/hourlyforecast.json
+http://HOME_ASSISTANT_IP:6066/forecast/?user=loxone_TEST&coord=10.681,48.56&asl=450&format=2&new_api=1
 ```
 
-They are exposed to the LoxBerry/Weather4Lox client at the original HTTP paths:
+The `format=2` response follows the documented Local Weather Service structure used by the Loxone Gen 1 client:
 
-```text
-/plugins/weather4lox/current.json
-/plugins/weather4lox/dailyforecast.json
-/plugins/weather4lox/hourlyforecast.json
-```
+- 29 metadata columns
+- one 10-column station metadata line
+- 19 columns per hourly forecast row
+- protocol-safe Loxone weather pictograms
+- local date/time and timezone information
 
-The envelope and field structure follow the Weather4Lox JSON schema v1.0 used by the original LoxBerry grabbers, including `location`, source metadata, current/daily/hourly data, Weather4Lox condition identifiers and Loxone weather codes. Files are written atomically and refreshed periodically.
-
-## Current test scope
-
-- HTTP server on TCP port 6066
-- `/health` endpoint
-- `/forecast/` endpoint
-- LoxBerry-compatible `current.json`, `dailyforecast.json` and `hourlyforecast.json`
-- Request logging for Loxone diagnostics
-- Reading weather data from Home Assistant
-- Configurable Home Assistant weather entity and sensor entities
-- Diagnostic `/raw` endpoint
-- Loxone format-2 response generation and validation
+The implementation can normalize Home Assistant forecast data to the configured target of 181 hourly values, using interpolation, daily fallback, cache fallback and synthetic fallback where configured.
 
 ## Configuration
 
-The default configuration targets these entities:
+The default configuration targets:
 
 - `weather.openweathermap`
-- `sensor.openweathermap_temperatur`
-- `sensor.openweathermap_gefuhlte_temperatur`
-- `sensor.openweathermap_luftfeuchtigkeit`
-- `sensor.openweathermap_druck`
-- `sensor.openweathermap_bewolkung`
-- `sensor.openweathermap_windgeschwindigkeit`
-- `sensor.openweathermap_windboengeschwindigkeit`
-- `sensor.openweathermap_windrichtung`
-- `sensor.openweathermap_regenintensitat`
-- `sensor.openweathermap_schneeintensitat`
+- the corresponding OpenWeatherMap temperature, feels-like, humidity, pressure, cloud, wind, rain and snow sensors
+- location `Wertingen`, Germany
+- latitude `48.56`, longitude `10.681`
+- timezone `Europe/Berlin`
 
-These can be changed in the add-on configuration.
+All entities and fallback behavior can be changed in the add-on configuration.
 
 ## Testing
 
-After installation, test the service from another device on the LAN:
+Check that the add-on is reachable:
 
 ```bash
 curl http://HOME_ASSISTANT_IP:6066/health
 ```
 
-Then test the Loxone endpoint:
+Check the Loxone-compatible response:
 
 ```bash
 curl "http://HOME_ASSISTANT_IP:6066/forecast/?user=loxone_TEST&coord=10.681,48.56&asl=450&format=2&new_api=1"
 ```
 
-Then test the three JSON files:
+Useful diagnostics are available at `/status`, `/raw` and `/debug/loxone/validate`.
 
-```bash
-curl "http://HOME_ASSISTANT_IP:6066/plugins/weather4lox/current.json"
-curl "http://HOME_ASSISTANT_IP:6066/plugins/weather4lox/dailyforecast.json"
-curl "http://HOME_ASSISTANT_IP:6066/plugins/weather4lox/hourlyforecast.json"
-```
+## Development
 
-Finally verify DNS:
+CI compiles the Python sources, validates the add-on configuration, builds the Home Assistant Docker image, runs the test suite and updates the version/forecast information in this README.
 
-```bash
-nslookup weather.loxone.com
-```
-
-The result should point to the Home Assistant IP address.
+The CI deliberately does **not** create ZIP packages. Home Assistant add-on installation is performed from the repository/add-on store or from the add-on source directory.
 
 ## License
 
 MIT
 
 <!-- AUTO-GENERATED: ci-docs.yml -->
-Current version: **0.3.8**  
+Current version: **0.4.1**  
 Forecast target: **181 hours**  
 <!-- END AUTO-GENERATED -->
