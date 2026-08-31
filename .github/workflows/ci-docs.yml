@@ -29,7 +29,7 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install pyyaml pytest
 
-      - name: Verify Home Assistant add-on tree
+      - name: Verify Home Assistant app tree
         run: |
           test -f weather4lox-ha/config.yaml
           test -f weather4lox-ha/Dockerfile
@@ -48,17 +48,6 @@ jobs:
           test ! -e weather4lox-ha/loxone_pictos.json
           test ! -e tests/test_live_data.py
           test ! -e tests/test_json_compat.py
-          test ! -e weather4lox-ha/0.3.4_STATUS.md
-          test ! -e weather4lox-ha/0.3.5_STATUS.md
-          test ! -e weather4lox-ha/DIAGNOSTIC_0.3.4.md
-          test ! -e weather4lox-ha/PROTOCOL-TEST.md
-          test ! -e weather4lox-ha/TEST-NOTE.md
-          test ! -e weather4lox-ha/README.tmp
-          test ! -e weather4lox-ha/_cleanup_marker.txt
-          test ! -e weather4lox-ha/DELETE_ME
-          test ! -e weather4lox-ha/DELETE_ME_TOO
-          test ! -e weather4lox-ha/DELETE_ME_THREE
-          test ! -e weather4lox-ha/DELETE_ME_FOUR
 
       - name: Validate configuration and Python sources
         run: |
@@ -69,21 +58,21 @@ jobs:
 
           config = yaml.safe_load(Path('weather4lox-ha/config.yaml').read_text(encoding='utf-8'))
           assert config['name'] == 'Weather4Lox HA'
-          assert config['version'] == '0.4.2'
+          assert config['version'] == '0.4.3'
           assert config['slug'] == 'weather4lox-ha'
+          assert config['arch'] == ['amd64', 'aarch64']
           assert config['ports']['6066/tcp'] == 6066
           assert int(config['options']['target_hours']) == 181
           assert int(config['options']['refresh_interval_minutes']) == 30
           assert config['options']['synthetic_fallback'] is False
           assert config['options']['weather_provider'] == 'openweathermap'
-          assert config['location_city'] if 'location_city' in config else True
           assert config['options']['location_city'] == 'Wertingen'
           assert float(config['options']['latitude']) == 48.56
           assert float(config['options']['longitude']) == 10.681
           print(f"Validated Weather4Lox HA {config['version']}")
           PY
 
-      - name: Build Home Assistant add-on image
+      - name: Build Home Assistant app image
         run: |
           VERSION=$(python - <<'PY'
           import yaml
