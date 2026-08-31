@@ -114,6 +114,6 @@ The result should point to the Home Assistant IP address.
 MIT
 
 <!-- AUTO-GENERATED: ci-docs.yml -->
-Current version: **0.3.7**  
+Current version: **0.3.8**  
 Forecast target: **181 hours**  
 <!-- END AUTO-GENERATED -->
