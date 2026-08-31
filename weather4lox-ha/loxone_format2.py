@@ -1,10 +1,5 @@
 #!/usr/bin/env python3
-"""Loxone Weather4Lox format-2 response compatibility.
-
-The format-2 response has one metadata header describing all 29 fields,
-a single station-metadata row with the first 10 station fields, followed by
-hourly rows containing only the 19 forecast fields.
-"""
+"""Loxone Weather4Lox format-2 response compatibility."""
 from __future__ import annotations
 
 import json
@@ -41,8 +36,10 @@ def metadata():
 
 
 def _timezone_info(core):
-    now = datetime.now().astimezone()
-    return now.tzname() or core.opts().get("timezone", "Europe/Berlin"), now.strftime("UTC%z")
+    now = core.local_dt(datetime.utcnow().isoformat())
+    raw_offset = now.strftime("%z")
+    utc_offset = f"UTC{raw_offset[:3]}.{raw_offset[3:]}" if len(raw_offset) == 5 else "UTC+00.00"
+    return now.tzname() or core.opts().get("timezone", "Europe/Berlin"), utc_offset
 
 
 def station_metadata(core, query):
@@ -95,19 +92,14 @@ def build_rows(core, forecast, query, diagnostic=False):
         snow = max(0, core.safe_float(item.get("snow"), 0))
         snow_fraction = snow / precipitation if precipitation else 0
         row = [
-            dt.strftime("%d.%m.%Y"),
-            dt.strftime("%a"),
-            dt.strftime("%H"),
+            dt.strftime("%d.%m.%Y"), dt.strftime("%a"), dt.strftime("%H"),
             _fmt(core, item.get("temperature", snap.get("temperature")), 1),
             _fmt(core, item.get("apparent_temperature", snap.get("feels_like")), 1),
             _fmt(core, item.get("wind_speed", snap.get("wind_speed")), 0),
             _fmt(core, item.get("wind_bearing", snap.get("wind_direction")), 0),
             _fmt(core, item.get("wind_gust_speed", snap.get("wind_gust")), 0),
-            _fmt(core, 0, 0),
-            _fmt(core, clouds, 0),
-            _fmt(core, 0, 0),
-            _fmt(core, precipitation, 1),
-            _fmt(core, probability, 0),
+            _fmt(core, 0, 0), _fmt(core, clouds, 0), _fmt(core, 0, 0),
+            _fmt(core, precipitation, 1), _fmt(core, probability, 0),
             _fmt(core, snow_fraction, 1),
             _fmt(core, item.get("pressure", snap.get("pressure")), 0),
             _fmt(core, item.get("humidity", snap.get("humidity")), 0),
@@ -122,8 +114,7 @@ def build_rows(core, forecast, query, diagnostic=False):
 
 
 def validate_payload(core, header, station, rows, expected_rows, expected_picto=None):
-    invalid = []
-    counts = []
+    invalid, counts = [], []
     for index, row in enumerate(rows):
         parts = row.rstrip(";").split(";")
         counts.append(len(parts))
@@ -131,30 +122,20 @@ def validate_payload(core, header, station, rows, expected_rows, expected_picto=
             pictocode = int(parts[17])
         except (ValueError, IndexError):
             pictocode = None
-        if pictocode not in VALID_PICTOS or (
-            expected_picto is not None and pictocode != expected_picto
-        ):
+        if pictocode not in VALID_PICTOS or (expected_picto is not None and pictocode != expected_picto):
             invalid.append({"row": index, "picto": pictocode})
 
     checks = {
-        "header_columns": len(header.split(";")),
-        "expected_header_columns": HEADER_COLUMNS,
-        "station_columns": len(station.split(";")),
-        "expected_station_columns": STATION_COLUMNS,
-        "rows": len(rows),
-        "expected_rows": expected_rows,
+        "header_columns": len(header.split(";")), "expected_header_columns": HEADER_COLUMNS,
+        "station_columns": len(station.split(";")), "expected_station_columns": STATION_COLUMNS,
+        "rows": len(rows), "expected_rows": expected_rows,
         "row_columns_min": min(counts) if counts else 0,
         "row_columns_max": max(counts) if counts else 0,
-        "expected_row_columns": WEATHER_COLUMNS,
-        "invalid_pictos": invalid,
-        "terminator": True,
+        "expected_row_columns": WEATHER_COLUMNS, "invalid_pictos": invalid, "terminator": True,
     }
     checks["ok"] = (
-        checks["header_columns"] == HEADER_COLUMNS
-        and checks["station_columns"] == STATION_COLUMNS
-        and len(rows) == expected_rows
-        and all(count == WEATHER_COLUMNS for count in counts)
-        and not invalid
+        checks["header_columns"] == HEADER_COLUMNS and checks["station_columns"] == STATION_COLUMNS
+        and len(rows) == expected_rows and all(count == WEATHER_COLUMNS for count in counts) and not invalid
     )
     return checks
 
@@ -162,33 +143,17 @@ def validate_payload(core, header, station, rows, expected_rows, expected_picto=
 def make_payload(core, forecast, query, diagnostic=False):
     if not forecast:
         raise RuntimeError("No forecast data available")
-    header = metadata()
-    station = station_metadata(core, query)
+    header, station = metadata(), station_metadata(core, query)
     rows = build_rows(core, forecast, query, diagnostic)
-    validation = validate_payload(
-        core,
-        header,
-        station,
-        rows,
-        len(forecast),
-        core.DIAGNOSTIC_PICTO if diagnostic else None,
-    )
+    validation = validate_payload(core, header, station, rows, len(forecast), core.DIAGNOSTIC_PICTO if diagnostic else None)
     if not validation["ok"]:
         raise RuntimeError("Loxone response validation failed: " + json.dumps(validation))
 
     valid_until = core.local_dt(forecast[-1]["datetime"]).strftime("%Y-%m-%d")
     payload = (
-        "<mb_metadata>\n"
-        + header
-        + ";\n</mb_metadata>\n"
-        + "<valid_until>"
-        + valid_until
-        + "</valid_until>\n"
-        + "<station>\n"
-        + station
-        + ";\n"
-        + "\n".join(rows)
-        + "\n</station>\n"
+        "<mb_metadata>\n" + header + ";\n</mb_metadata>\n"
+        + "<valid_until>" + valid_until + "</valid_until>\n"
+        + "<station>\n" + station + ";\n" + "\n".join(rows) + "\n</station>\n"
     )
     return payload, validation
 
@@ -200,40 +165,24 @@ def reference_diagnostic(core, query):
     lines = station_text.splitlines()
     station = lines[0].rstrip(";").split(";") if lines else []
     rows = [line.rstrip(";").split(";") for line in lines[1:] if line]
-    picto_values = sorted({int(row[17]) for row in rows if len(row) > 17})
     return {
-        "version": core.VERSION,
-        "source": source,
-        "fallback_count": fallback,
-        "rows": len(rows),
-        "columns": len(rows[0]) if rows else 0,
-        "station_columns": len(station),
-        "first_row": rows[0] if rows else [],
-        "middle_row": rows[len(rows) // 2] if rows else [],
-        "last_row": rows[-1] if rows else [],
-        "picto_codes": picto_values,
+        "version": core.VERSION, "source": source, "fallback_count": fallback,
+        "rows": len(rows), "columns": len(rows[0]) if rows else 0,
+        "station_columns": len(station), "first_row": rows[0] if rows else [],
+        "middle_row": rows[len(rows) // 2] if rows else [], "last_row": rows[-1] if rows else [],
+        "picto_codes": sorted({int(row[17]) for row in rows if len(row) > 17}),
         "validation": validation,
     }
 
 
 def install(core):
     """Patch the proven HTTP server with the documented format-2 serializer."""
-    # server_035 deliberately exposes only the high-level helpers. Re-export
-    # the low-level formatter helpers needed by this compatibility layer from
-    # its proven implementation module.
     implementation = getattr(core, "core", core)
     for name in ("fmt", "safe_float", "clamp", "local_dt", "picto", "DIAGNOSTIC_PICTO", "VERSION"):
         if not hasattr(core, name):
             setattr(core, name, getattr(implementation, name))
-
     core.metadata = metadata
-    core.build_rows = lambda forecast, query, diagnostic=False: build_rows(
-        core, forecast, query, diagnostic
-    )
-    core.validate_payload = lambda header, rows, expected_rows, expected_picto=None: (
-        validate_payload(core, header, ";;;;;;;;;", rows, expected_rows, expected_picto)
-    )
-    core.make_payload = lambda forecast, query, diagnostic=False: make_payload(
-        core, forecast, query, diagnostic
-    )
+    core.build_rows = lambda forecast, query, diagnostic=False: build_rows(core, forecast, query, diagnostic)
+    core.validate_payload = lambda header, rows, expected_rows, expected_picto=None: validate_payload(core, header, ";;;;;;;;;", rows, expected_rows, expected_picto)
+    core.make_payload = lambda forecast, query, diagnostic=False: make_payload(core, forecast, query, diagnostic)
     core.reference_diagnostic = lambda query: reference_diagnostic(core, query)
