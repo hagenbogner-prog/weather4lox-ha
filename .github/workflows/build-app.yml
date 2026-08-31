@@ -65,6 +65,7 @@ jobs:
         uses: home-assistant/builder/actions/build-image@4de35182ce1e329181bffcbcc84d33db5e2c7e10
         with:
           arch: ${{ matrix.arch }}
+          context: ./weather4lox-ha
           image: ghcr.io/hagenbogner-prog/${{ matrix.arch }}-weather4lox-ha
           image-tags: |
             ${{ steps.version.outputs.version }}
