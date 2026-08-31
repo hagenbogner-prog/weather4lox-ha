@@ -13,11 +13,10 @@ RUN apk add --no-cache python3
 COPY run.sh /run.sh
 COPY server.py /server.py
 COPY server_035.py /server_035.py
-COPY live_data.py /live_data.py
-COPY json_compat.py /json_compat.py
 COPY bootstrap.py /bootstrap.py
-COPY protocol /protocol
 COPY loxone_format2.py /loxone_format2.py
+COPY protocol /protocol
+
 RUN chmod a+x /run.sh
 
 CMD ["/run.sh"]
