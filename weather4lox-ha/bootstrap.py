@@ -34,6 +34,9 @@ def generated_at():
     return datetime.now(configured_tz()).replace(microsecond=0).isoformat()
 
 
+# Keep Weather4Lox format-2 timestamps in the configured local timezone.
+server_035.local_dt = local_dt
+
 # The format-2 response follows the Weather4Lox/Loxone structure documented
 # by SmartHome.Exposed: a 29-column metadata header, one 10-column station
 # metadata row, then 19-column hourly forecast rows.
