@@ -4,7 +4,9 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parents[1] / "weather4lox-ha"))
-import live_data
+import bootstrap
+
+live_data = bootstrap.live_data
 
 
 def test_condition_mapping_uses_documented_loxone_codes():
