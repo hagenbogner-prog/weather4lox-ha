@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
-"""Weather4Lox HA 0.3.5 compatibility layer.
+"""Home Assistant compatibility layer for the Loxone Gen 1 weather protocol.
 
-Keeps the stable 0.3.4 core but normalizes the Home Assistant weather
-response to the units and field semantics expected by the Loxone Gen 1
-weather protocol.
+Keeps the stable HTTP/data implementation and normalizes Home Assistant
+weather values to the units and field semantics expected by Loxone Gen 1.
 """
 import math
 import os
@@ -17,7 +16,7 @@ from protocol.loxone_gen1 import (
     VALID_LOXONE_PICTOS,
 )
 
-VERSION = "0.3.5"
+VERSION = "0.4.1"
 core.VERSION = VERSION
 core.Handler.server_version = f"Weather4LoxHA/{VERSION}"
 
@@ -88,19 +87,17 @@ def timezone_offset_hours(dt):
 
 
 def loxone_picto(item):
-    """Return a protocol-safe Loxone picto code, never an emulator code."""
+    """Return a protocol-safe Loxone weather code."""
     condition = str(item.get("condition") or "").lower()
     mapped = LOXONE_PICTOS.get(condition)
     if mapped in VALID_LOXONE_PICTOS:
         return mapped
-
     try:
         supplied = int(item.get("picto-code"))
         if supplied in VALID_LOXONE_PICTOS:
             return supplied
     except (TypeError, ValueError):
         pass
-
     return DEFAULT_LOXONE_PICTO
 
 
@@ -160,7 +157,6 @@ def enhanced_build_rows(forecast, query, diagnostic=False):
     return rows
 
 
-# The core validator must use the protocol range, not the emulator's 1..35 range.
 core.VALID_PICTOS = VALID_LOXONE_PICTOS
 core.build_rows = enhanced_build_rows
 
