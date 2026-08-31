@@ -1,12 +1,11 @@
 name: Weather4Lox HA
-version: "0.4.2"
+version: "0.4.3"
 slug: weather4lox-ha
 description: Loxone Gen 1 Weather Service emulator for Home Assistant
 url: https://github.com/hagenbogner-prog/weather4lox-ha
 arch:
   - amd64
   - aarch64
-  - armv7
 startup: services
 boot: auto
 init: false
