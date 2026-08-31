@@ -7,7 +7,7 @@ station metadata line, and 19-column hourly forecast rows.
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 
 HEADER_COLUMNS = 29
 STATION_COLUMNS = 10
@@ -39,7 +39,7 @@ def metadata():
 
 
 def _timezone_info(core):
-    now = core.local_dt(datetime.utcnow().isoformat())
+    now = core.local_dt(datetime.now(timezone.utc).isoformat())
     raw_offset = now.strftime("%z")
     utc_offset = (
         f"UTC{raw_offset[:3]}.{raw_offset[3:]}"
@@ -147,7 +147,7 @@ def validate_payload(core, header, station, rows, expected_rows, expected_picto=
     checks = {
         "header_columns": len(header.split(";")),
         "expected_header_columns": HEADER_COLUMNS,
-        "station_columns": len(station.rstrip(";").split(";")),
+        "station_columns": len(station.split(";")),
         "expected_station_columns": STATION_COLUMNS,
         "rows": len(rows),
         "expected_rows": expected_rows,
@@ -228,13 +228,12 @@ def reference_diagnostic(core, query):
 
 def install(core):
     """Install the format-2 serializer without changing provider logic."""
-    implementation = getattr(core, "core", core)
     for name in (
         "fmt", "safe_float", "clamp", "local_dt", "picto", "DIAGNOSTIC_PICTO",
         "VALID_PICTOS", "VERSION", "opts", "snapshot", "obtain_forecast",
     ):
         if not hasattr(core, name):
-            setattr(core, name, getattr(implementation, name))
+            raise AttributeError(f"Core is missing required serializer function: {name}")
     core.metadata = metadata
     core.build_rows = lambda forecast, query, diagnostic=False: build_rows(
         core, forecast, query, diagnostic
