@@ -4,11 +4,6 @@
 Keeps the stable 0.3.4 core but normalizes the Home Assistant weather
 response to the units and field semantics expected by the Loxone Gen 1
 weather protocol.
-
-Important: the protocol's ``picto-code`` is the documented Loxone weather
-code (1..29).  The 30..35 values used by the old LoxBerry weather emulator
-are NOT valid protocol values and can make the Loxone client fail while
-resolving its weather icon.
 """
 import math
 import os
@@ -16,32 +11,15 @@ import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
 import server as core
+from protocol.loxone_gen1 import (
+    DEFAULT_LOXONE_PICTO,
+    LOXONE_PICTOS,
+    VALID_LOXONE_PICTOS,
+)
 
 VERSION = "0.3.5"
 core.VERSION = VERSION
 core.Handler.server_version = f"Weather4LoxHA/{VERSION}"
-
-# Documented Loxone Gen 1 weather-service codes.
-# These are deliberately kept separate from the Weather4Lox emulator codes.
-LOXONE_PICTOS = {
-    "sunny": 1,
-    "clear-night": 1,
-    "partlycloudy": 3,
-    "cloudy": 5,
-    "fog": 6,
-    "rainy": 11,
-    "pouring": 12,
-    "snowy": 21,
-    "snowy-rainy": 26,
-    "lightning": 18,
-    "lightning-rainy": 19,
-    "hail": 23,
-    "windy": 4,
-    "windy-variant": 4,
-    "exceptional": 5,
-}
-VALID_LOXONE_PICTOS = set(range(1, 30))
-DEFAULT_LOXONE_PICTO = 5
 
 
 def as_float(value, default=0.0):
@@ -116,7 +94,6 @@ def loxone_picto(item):
     if mapped in VALID_LOXONE_PICTOS:
         return mapped
 
-    # A supplied picto-code may already be a documented Loxone code.
     try:
         supplied = int(item.get("picto-code"))
         if supplied in VALID_LOXONE_PICTOS:
