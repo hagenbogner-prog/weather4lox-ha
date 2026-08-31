@@ -2,7 +2,9 @@
 
 Home Assistant add-on that emulates the Loxone Gen 1 Weather Service on TCP port 6066. It reads the selected Home Assistant weather provider and serves the `format=2` response expected by a Loxone Miniserver.
 
-The protocol implementation follows the architecture and field structure described by SmartHome.Exposed's Local Weather Service Emulator: DNS redirection is handled outside the add-on, the add-on keeps a local forecast cache, and the Loxone client receives a Weather4Loxone format-2 response from the local service. urlLocal Weather Service Emulatorhttps://smarthome.exposed/local-weather-service-emulator/
+The protocol implementation follows the architecture and field structure described by SmartHome.Exposed's Local Weather Service Emulator: DNS redirection is handled outside the add-on, the add-on keeps a local forecast cache, and the Loxone client receives a Weather4Loxone format-2 response from the local service.
+
+Reference: https://smarthome.exposed/local-weather-service-emulator/
 
 ## Architecture
 
