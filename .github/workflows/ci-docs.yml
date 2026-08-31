@@ -41,7 +41,7 @@ jobs:
           options = data.get('options', {})
 
           assert data['name'] == 'Weather4Lox HA'
-          assert data['version'] == '0.3.9'
+          assert data['version'] == '0.4.0'
           assert int(options['target_hours']) == 181
           assert options['location_city'] == 'Wertingen'
           assert float(options['latitude']) == 48.56
@@ -100,7 +100,7 @@ jobs:
                    f'Current version: **{version}**  \n'
                    f'Forecast target: **{hours} hours**  \n'
                    '<!-- END AUTO-GENERATED -->')
-          pattern = r'<!-- AUTO-GENERATED: ci-docs\.yml -->.*?<!-- END AUTO-GENERATED -->'
+          pattern = r'<!-- AUTO-GENERATED: ci-docs\\.yml -->.*?<!-- END AUTO-GENERATED -->'
           text = re.sub(pattern, block, text, flags=re.S)
           if block not in text:
               text = text.rstrip() + '\n\n' + block + '\n'
