@@ -56,8 +56,10 @@ jobs:
           test -f weather4lox-ha/live_data.py
           test -f weather4lox-ha/json_compat.py
           test -f weather4lox-ha/bootstrap.py
+          test -f weather4lox-ha/loxone_format2.py
           test -f weather4lox-ha/protocol/__init__.py
           test -f weather4lox-ha/protocol/loxone_gen1.py
+          test -f tests/test_loxone_format2_emulator.py
           test -f weather4lox-ha/icon.png
           test -f weather4lox-ha/logo.png
           test -f weather4lox-ha/loxone_pictos.json
