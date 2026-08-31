@@ -76,6 +76,7 @@ def test_daily_fallback_has_v4_nested_shape():
 
 
 def test_current_envelope_uses_provider_metadata_key(tmp_path, monkeypatch):
+    monkeypatch.setattr(live_data, "DATA_DIR", tmp_path)
     monkeypatch.setattr(live_data, "CURRENT_FILE", tmp_path / "current.json")
     monkeypatch.setattr(live_data, "HOURLY_FILE", tmp_path / "hourlyforecast.json")
     monkeypatch.setattr(live_data, "DAILY_FILE", tmp_path / "dailyforecast.json")
