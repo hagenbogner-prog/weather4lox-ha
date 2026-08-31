@@ -7,7 +7,8 @@ from zoneinfo import ZoneInfo
 import server_035
 
 # server_035 imports the proven implementation as ``core`` but intentionally
-# does not re-export every helper. The JSON layer uses these helpers directly.
+# does not re-export every helper. The JSON layer and protocol layer use these
+# helpers directly.
 for name in (
     "opts",
     "parse_dt",
@@ -19,8 +20,6 @@ for name in (
     "log",
 ):
     setattr(server_035, name, getattr(server_035.core, name))
-
-import live_data
 
 
 def configured_tz():
@@ -35,6 +34,18 @@ def local_dt(value):
 def generated_at():
     return datetime.now(configured_tz()).replace(microsecond=0).isoformat()
 
+
+# The Loxone format-2 response uses configured local time for its date,
+# weekday and hour fields.
+server_035.local_dt = local_dt
+
+# Install the exact Weather4Lox/Loxone format-2 structure: 29 metadata
+# columns, one 10-column station metadata line, and 19-column hourly rows.
+import loxone_format2
+
+loxone_format2.install(server_035)
+
+import live_data
 
 live_data._iso_local = local_dt
 live_data._generated_at = generated_at
