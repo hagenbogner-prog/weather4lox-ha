@@ -20,8 +20,6 @@ for name in (
 ):
     setattr(server_035, name, getattr(server_035.core, name))
 
-import live_data
-
 
 def configured_tz():
     return ZoneInfo(server_035.opts().get("timezone", "Europe/Berlin"))
@@ -35,6 +33,15 @@ def local_dt(value):
 def generated_at():
     return datetime.now(configured_tz()).replace(microsecond=0).isoformat()
 
+
+# The format-2 response follows the Weather4Lox/Loxone structure documented
+# by SmartHome.Exposed: a 29-column metadata header, one 10-column station
+# metadata row, then 19-column hourly forecast rows.
+import loxone_format2
+
+loxone_format2.install(server_035)
+
+import live_data
 
 live_data._iso_local = local_dt
 live_data._generated_at = generated_at
