@@ -16,6 +16,7 @@ COPY server_035.py /server_035.py
 COPY live_data.py /live_data.py
 COPY json_compat.py /json_compat.py
 COPY bootstrap.py /bootstrap.py
+COPY protocol /protocol
 RUN chmod a+x /run.sh
 
 CMD ["/run.sh"]
