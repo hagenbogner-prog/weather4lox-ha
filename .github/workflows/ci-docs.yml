@@ -41,7 +41,7 @@ jobs:
           options = data.get('options', {})
 
           assert data['name'] == 'Weather4Lox HA'
-          assert data['version'] == '0.3.7'
+          assert data['version'] == '0.3.8'
           assert int(options['target_hours']) == 181
           assert options['location_city'] == 'Wertingen'
           assert float(options['latitude']) == 48.56
@@ -54,6 +54,7 @@ jobs:
           test -f weather4lox-ha/server.py
           test -f weather4lox-ha/server_035.py
           test -f weather4lox-ha/live_data.py
+          test -f weather4lox-ha/json_compat.py
           test -f weather4lox-ha/bootstrap.py
           test -f weather4lox-ha/icon.png
           test -f weather4lox-ha/logo.png
@@ -72,14 +73,10 @@ jobs:
             -t weather4lox-ha:test \
             weather4lox-ha
 
-      - name: Run tests if available
+      - name: Run tests
         run: |
-          if [ -d tests ]; then
-            python -m pip install pytest
-            python -m pytest -q
-          else
-            echo 'No tests directory; structural and Docker build verification completed.'
-          fi
+          python -m pip install pytest
+          python -m pytest -q
 
       - name: Generate Documentation
         run: |

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prepare the 0.3.5 compatibility module for the live JSON layer."""
+"""Prepare the production compatibility layers for the live service."""
 
 from datetime import datetime
 from zoneinfo import ZoneInfo
@@ -15,6 +15,7 @@ for name in (
     "selected_entity",
     "service_forecast",
     "snapshot",
+    "obtain_forecast",
     "log",
 ):
     setattr(server_035, name, getattr(server_035.core, name))
@@ -50,6 +51,14 @@ def location(attrs=None):
 
 
 live_data._location = location
+live_data.HOURLY_LIMIT = 167
+
+# The live JSON files must follow the same envelope/field semantics as the
+# current Weather4Lox v4 LoxBerry grabbers. Keep the HTTP handler in
+# live_data.py, but replace only the file-generation implementation.
+import json_compat
+
+live_data.refresh = json_compat.refresh
 
 if __name__ == "__main__":
     live_data.main()
