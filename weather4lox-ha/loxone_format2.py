@@ -218,6 +218,14 @@ def reference_diagnostic(core, query):
 
 def install(core):
     """Patch the proven HTTP server with the documented format-2 serializer."""
+    # server_035 deliberately exposes only the high-level helpers. Re-export
+    # the low-level formatter helpers needed by this compatibility layer from
+    # its proven implementation module.
+    implementation = getattr(core, "core", core)
+    for name in ("fmt", "safe_float", "clamp", "local_dt", "picto", "DIAGNOSTIC_PICTO", "VERSION"):
+        if not hasattr(core, name):
+            setattr(core, name, getattr(implementation, name))
+
     core.metadata = metadata
     core.build_rows = lambda forecast, query, diagnostic=False: build_rows(
         core, forecast, query, diagnostic
