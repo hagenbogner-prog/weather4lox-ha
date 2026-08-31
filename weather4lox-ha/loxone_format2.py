@@ -139,7 +139,7 @@ def validate_payload(core, header, station, rows, expected_rows, expected_picto=
     checks = {
         "header_columns": len(header.split(";")),
         "expected_header_columns": HEADER_COLUMNS,
-        "station_columns": len(station.rstrip(";").split(";")),
+        "station_columns": len(station.split(";")),
         "expected_station_columns": STATION_COLUMNS,
         "rows": len(rows),
         "expected_rows": expected_rows,
