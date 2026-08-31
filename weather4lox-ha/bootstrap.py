@@ -3,13 +3,12 @@
 
 from datetime import datetime
 from threading import Event, Thread
-from time import sleep
 from zoneinfo import ZoneInfo
 
 import loxone_format2
 import server
 
-VERSION = "0.4.2"
+VERSION = "0.4.3"
 server.VERSION = VERSION
 server.Handler.server_version = f"Weather4LoxHA/{VERSION}"
 
