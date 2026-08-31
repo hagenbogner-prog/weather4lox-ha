@@ -48,8 +48,8 @@ def test_format2_uses_station_metadata_plus_19_weather_columns(monkeypatch):
 
     station_block = payload.split("<station>\n", 1)[1].split("\n</station>", 1)[0]
     lines = station_block.splitlines()
-    assert len(lines[0].rstrip(";").split(";")) == 10
-    assert len(lines[1].rstrip(";").split(";")) == 19
+    assert len(lines[0].split(";")[:-1]) == 10
+    assert len(lines[1].split(";")[:-1]) == 19
     assert lines[1].split(";")[0] == "31.08.2026"
     assert lines[1].split(";")[1] == "Mon"
     assert lines[1].split(";")[2] == "18"
