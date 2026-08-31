@@ -20,6 +20,14 @@ def _fmt(core, value, digits=2, default="0"):
     return core.fmt(value, digits, default)
 
 
+def _coord(value, default_lon=10.681, default_lat=48.56):
+    try:
+        lon, lat = str(value).split(",", 1)
+        return float(lon), float(lat)
+    except (TypeError, ValueError):
+        return default_lon, default_lat
+
+
 def metadata():
     return (
         "id;name;longitude;latitude;height (m.asl.);country;timezone;"
@@ -39,9 +47,8 @@ def _timezone_info(core):
 
 def station_metadata(core, query):
     options = core.opts()
-    lon, lat = core.coord(query.get("coord", [
-        f"{options.get('longitude', 10.681)},{options.get('latitude', 48.56)}"
-    ])[0])
+    fallback_coord = f"{options.get('longitude', 10.681)},{options.get('latitude', 48.56)}"
+    lon, lat = _coord(query.get("coord", [fallback_coord])[0])
     asl = query.get("asl", [str(options.get("elevation_m", 450))])[0]
     timezone_name, utc_offset = _timezone_info(core)
     return ";".join([
@@ -59,7 +66,6 @@ def station_metadata(core, query):
 
 
 def build_rows(core, forecast, query, diagnostic=False):
-    options = core.opts()
     snap = (
         core.snapshot()
         if not diagnostic
@@ -217,7 +223,7 @@ def install(core):
         core, forecast, query, diagnostic
     )
     core.validate_payload = lambda header, rows, expected_rows, expected_picto=None: (
-        validate_payload(core, header, "", rows, expected_rows, expected_picto)
+        validate_payload(core, header, ";;;;;;;;;", rows, expected_rows, expected_picto)
     )
     core.make_payload = lambda forecast, query, diagnostic=False: make_payload(
         core, forecast, query, diagnostic
