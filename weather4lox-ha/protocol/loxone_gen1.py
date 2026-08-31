@@ -1,11 +1,12 @@
-"""Loxone Gen-1 Weather Service format=2 protocol constants.
+"""Loxone Gen 1 Weather Service format=2 protocol constants.
 
-The local emulator described by SmartHome.Exposed uses the Weather4Loxone
-CSV response: a 29-column metadata header followed by 29-column station
-rows. Keep the protocol schema independent from Home Assistant/provider data.
+The service returns a 29-column metadata header, one 10-column station
+metadata line, and 19-column hourly forecast rows.
 """
 
 FORMAT2_COLUMNS = 29
+STATION_COLUMNS = 10
+WEATHER_COLUMNS = 19
 
 FORMAT2_HEADER = (
     "id;name;longitude;latitude;height (m.asl.);country;timezone;"
@@ -17,8 +18,6 @@ FORMAT2_HEADER = (
     "radiation (W/m2)"
 )
 
-# Documented Loxone Gen-1 weather-service codes used by the current
-# compatibility layer. Do not mix these with Weather4Lox emulator codes.
 LOXONE_PICTOS = {
     "sunny": 1,
     "clear-night": 1,
@@ -47,30 +46,35 @@ def picto_for_condition(condition):
 
 
 def validate_row(row):
-    """Validate one semicolon-delimited format=2 station row."""
-    parts = row.split(";")
-    if len(parts) != FORMAT2_COLUMNS:
+    """Validate one semicolon-delimited 19-column weather row."""
+    parts = row.rstrip(";").split(";")
+    if len(parts) != WEATHER_COLUMNS:
         return False
     try:
-        picto = int(parts[27])
+        picto = int(parts[17])
     except (TypeError, ValueError):
         return False
     return picto in VALID_LOXONE_PICTOS
 
 
-def validate_payload(header, rows):
-    """Return a compact validation result for a format=2 payload."""
-    row_counts = [len(row.split(";")) for row in rows]
+def validate_payload(header, station, rows):
+    """Validate the complete format=2 column structure."""
+    row_counts = [len(row.rstrip(";").split(";")) for row in rows]
+    station_count = len(station.rstrip(";").split(";"))
     ok = (
         len(header.split(";")) == FORMAT2_COLUMNS
-        and all(count == FORMAT2_COLUMNS for count in row_counts)
+        and station_count == STATION_COLUMNS
+        and all(count == WEATHER_COLUMNS for count in row_counts)
         and all(validate_row(row) for row in rows)
     )
     return {
         "ok": ok,
         "header_columns": len(header.split(";")),
+        "station_columns": station_count,
         "row_columns_min": min(row_counts) if row_counts else 0,
         "row_columns_max": max(row_counts) if row_counts else 0,
         "rows": len(rows),
-        "expected_columns": FORMAT2_COLUMNS,
+        "expected_header_columns": FORMAT2_COLUMNS,
+        "expected_station_columns": STATION_COLUMNS,
+        "expected_row_columns": WEATHER_COLUMNS,
     }
