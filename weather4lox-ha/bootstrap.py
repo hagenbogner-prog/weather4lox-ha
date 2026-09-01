@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Bootstrap the Weather4Lox HA app and its independent cache refresher."""
 
+import os
 from datetime import datetime
 from threading import Event, Thread
+from urllib.parse import urlparse
 from zoneinfo import ZoneInfo
 
 import loxone_format2
@@ -24,6 +26,33 @@ def local_dt(value):
 
 server.local_dt = local_dt
 loxone_format2.install(server)
+
+_original_do_get = server.Handler.do_GET
+
+
+def control_do_get(self):
+    path = urlparse(self.path).path.rstrip("/")
+    if path == "/control/clear-cache":
+        try:
+            with server.lock:
+                server.cache = None
+                if os.path.exists(server.CACHE_FILE):
+                    os.remove(server.CACHE_FILE)
+            self.json({"ok": True, "status": "🔴 Error", "message": "Cache cleared"})
+        except Exception as exc:
+            self.json({"ok": False, "error": str(exc)}, 500)
+        return
+    if path == "/control/refresh":
+        try:
+            forecast, source, meta = server.obtain_forecast(force=True)
+            self.json({"ok": True, "source": source, "entries": len(forecast), "metadata": meta})
+        except Exception as exc:
+            self.json({"ok": False, "error": str(exc)}, 500)
+        return
+    _original_do_get(self)
+
+
+server.Handler.do_GET = control_do_get
 
 
 def refresh_loop(stop: Event) -> None:
