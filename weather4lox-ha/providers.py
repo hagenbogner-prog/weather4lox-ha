@@ -36,9 +36,8 @@ def _options(options: dict | None) -> dict:
         return {}
 
 
-def _section(provider: str, options: dict) -> dict:
-    section = options.get(provider, {})
-    return section if isinstance(section, dict) else {}
+def _prefix(provider: str) -> str:
+    return "dwd" if provider == "dwd" else "openweathermap"
 
 
 def forecast_days(provider: str, options: dict | None = None) -> int:
@@ -50,14 +49,14 @@ def forecast_days(provider: str, options: dict | None = None) -> int:
 def refresh_minutes(provider: str, options: dict | None = None) -> int:
     options = _options(options)
     profile = get_profile(provider)
-    value = int(_section(provider, options).get("refresh_interval_minutes", profile.default_refresh_minutes))
+    value = int(options.get(f"{_prefix(provider)}_refresh_interval_minutes", profile.default_refresh_minutes))
     return max(30, min(value, 1440))
 
 
 def cache_ttl_minutes(provider: str, options: dict | None = None) -> int:
     options = _options(options)
     profile = get_profile(provider)
-    value = int(_section(provider, options).get("cache_validity_hours", profile.default_cache_ttl_minutes // 60))
+    value = int(options.get(f"{_prefix(provider)}_cache_validity_hours", profile.default_cache_ttl_minutes // 60))
     horizon_minutes = forecast_days(provider, options) * 24 * 60
     return max(24 * 60, min(value * 60, horizon_minutes))
 
