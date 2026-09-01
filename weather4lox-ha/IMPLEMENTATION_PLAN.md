@@ -1,11 +1,11 @@
 # Implementation plan
 
 1. Provider selection is exclusive: DWD or OpenWeatherMap.
-2. Auto-discover matching `weather.*` entities, with explicit entity override.
+2. Auto-discover matching `weather.*` entities, with an explicit entity override.
 3. Use provider-specific refresh and cache policies.
-4. Request only forecast types supported by the selected HA weather entity and preserve actual coverage/resolution.
-5. Remove normal-operation synthetic forecast generation.
-6. Keep the last successful cache after refresh failures.
-7. Publish normalized values to Loxone Format 2 on port 6066.
-8. Optionally publish HA sensors using MQTT discovery when MQTT is available.
-9. Expose cache/refresh diagnostics and manual refresh/clear operations.
+4. Fetch real forecast data through Home Assistant and preserve its actual coverage/resolution.
+5. Never generate synthetic weather values during normal operation.
+6. Replace the cache atomically after a successful refresh; preserve the last successful cache after a failure.
+7. Serialize the cached normalized data as Loxone Gen 1 Weather4Loxone format=2 on TCP 6066.
+8. Optionally publish normalized values to Home Assistant through MQTT Discovery.
+9. Expose cache status, refresh/clear controls, and diagnostics.
