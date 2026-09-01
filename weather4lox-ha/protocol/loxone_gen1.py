@@ -1,8 +1,4 @@
-"""Loxone Gen 1 Weather Service format=2 protocol constants.
-
-The service returns a 29-column metadata header, one 10-column station
-metadata line, and 19-column hourly forecast rows.
-"""
+"""Loxone Gen 1 Weather Service format=2 protocol constants."""
 
 FORMAT2_COLUMNS = 29
 STATION_COLUMNS = 10
@@ -18,70 +14,56 @@ FORMAT2_HEADER = (
     "radiation (W/m2)"
 )
 
+# Weather4Loxone / SmartHome.Exposed format-2 examples use these stable codes.
 LOXONE_PICTOS = {
     "sunny": 1,
-    "clear-night": 1,
-    "partlycloudy": 3,
-    "cloudy": 5,
-    "fog": 6,
-    "rainy": 11,
-    "pouring": 12,
-    "snowy": 21,
-    "snowy-rainy": 26,
-    "lightning": 18,
-    "lightning-rainy": 19,
+    "clear-night": 2,
+    "partlycloudy": 14,
+    "cloudy": 22,
+    "fog": 22,
+    "rainy": 23,
+    "pouring": 23,
+    "snowy": 24,
+    "snowy-rainy": 24,
+    "lightning": 23,
+    "lightning-rainy": 23,
     "hail": 23,
-    "windy": 4,
-    "windy-variant": 4,
-    "exceptional": 5,
+    "windy": 22,
+    "windy-variant": 22,
+    "exceptional": 22,
+    "unknown": 22,
 }
 
-VALID_LOXONE_PICTOS = set(range(1, 30))
-DEFAULT_LOXONE_PICTO = 5
+VALID_LOXONE_PICTOS = set(range(1, 36))
+DEFAULT_LOXONE_PICTO = 22
 
 
 def picto_for_condition(condition):
     """Map a Home Assistant condition to a protocol-safe Loxone code."""
-    return LOXONE_PICTOS.get(str(condition or "").lower(), DEFAULT_LOXONE_PICTO)
+    return LOXONE_PICTOS.get(str(condition or "unknown").lower(), DEFAULT_LOXONE_PICTO)
 
 
 def _split_fields(value):
-    """Preserve intentionally empty fields while accepting one final delimiter."""
     return value[:-1].split(";") if value.endswith(";") else value.split(";")
 
 
 def validate_row(row):
-    """Validate a semicolon-delimited format-2 weather row.
-
-    The 19-column hourly row is also accepted when embedded in the complete
-    29-column station/forecast representation used by the legacy test fixture.
-    """
     parts = _split_fields(row)
-    if len(parts) == WEATHER_COLUMNS:
-        picto_index = 17
-    elif len(parts) == FORMAT2_COLUMNS:
-        picto_index = 27
-    else:
+    if len(parts) != WEATHER_COLUMNS:
         return False
     try:
-        picto = int(parts[picto_index])
+        picto = int(parts[17])
     except (TypeError, ValueError):
         return False
     return picto in VALID_LOXONE_PICTOS
 
 
 def validate_payload(header, station_or_rows, rows=None):
-    """Validate the complete format=2 structure.
-
-    Supports both the current ``(header, station, rows)`` API and the
-    lightweight ``(header, rows)`` compatibility form used by protocol tests.
-    """
     if rows is None:
         station = ""
         rows = station_or_rows
     else:
         station = station_or_rows
-
     row_counts = [len(_split_fields(row)) for row in rows]
     station_count = len(_split_fields(station)) if station else STATION_COLUMNS
     header_count = len(_split_fields(header))
