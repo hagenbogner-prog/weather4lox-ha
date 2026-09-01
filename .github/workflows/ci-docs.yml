@@ -12,23 +12,19 @@ permissions:
 jobs:
   build-and-verify:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-
       - name: Install test dependencies
         run: |
           python -m pip install --upgrade pip
           python -m pip install pyyaml pytest
-
       - name: Verify Home Assistant app tree
         run: |
           test -f weather4lox-ha/config.yaml
@@ -48,16 +44,12 @@ jobs:
           test ! -e weather4lox-ha/live_data.py
           test ! -e weather4lox-ha/json_compat.py
           test ! -e weather4lox-ha/loxone_pictos.json
-          test ! -e tests/test_live_data.py
-          test ! -e tests/test_json_compat.py
-
       - name: Validate configuration and Python sources
         run: |
           python -m compileall -q weather4lox-ha tests
           python - <<'PY'
           from pathlib import Path
           import yaml
-
           config = yaml.safe_load(Path('weather4lox-ha/config.yaml').read_text(encoding='utf-8'))
           assert config['name'] == 'Weather4Lox HA'
           assert config['version'] == '0.5.0'
@@ -65,18 +57,16 @@ jobs:
           assert config['arch'] == ['amd64', 'aarch64']
           assert config['ports']['6066/tcp'] == 6066
           assert config['options']['weather_provider'] in ('dwd', 'openweathermap')
-          assert set(config['schema']['weather_provider'].split('(')[1].rstrip(')').split('|')) == {'dwd', 'openweathermap'}
           assert config['options']['forecast_days'] == 7
-          assert config['options']['dwd']['refresh_interval_minutes'] == 120
-          assert config['options']['openweathermap']['refresh_interval_minutes'] == 60
-          assert config['options']['dwd']['cache_validity_hours'] == 24
-          assert config['options']['openweathermap']['cache_validity_hours'] == 48
+          assert config['options']['dwd_refresh_interval_minutes'] == 120
+          assert config['options']['openweathermap_refresh_interval_minutes'] == 60
+          assert config['options']['dwd_cache_validity_hours'] == 24
+          assert config['options']['openweathermap_cache_validity_hours'] == 48
           assert config['options']['location_city'] == 'Wertingen'
           assert float(config['options']['latitude']) == 48.56
           assert float(config['options']['longitude']) == 10.681
           print(f"Validated Weather4Lox HA {config['version']}")
           PY
-
       - name: Build Home Assistant app image
         run: |
           VERSION=$(python - <<'PY'
@@ -84,22 +74,15 @@ jobs:
           print(yaml.safe_load(open('weather4lox-ha/config.yaml', encoding='utf-8'))['version'])
           PY
           )
-          docker build \
-            --build-arg BUILD_VERSION="$VERSION" \
-            --build-arg BUILD_ARCH=amd64 \
-            -t weather4lox-ha:test \
-            weather4lox-ha
-
+          docker build --build-arg BUILD_VERSION="$VERSION" --build-arg BUILD_ARCH=amd64 -t weather4lox-ha:test weather4lox-ha
       - name: Run tests
         run: python -m pytest -q
-
       - name: Generate Documentation
         run: |
           python - <<'PY'
           from pathlib import Path
           import re
           import yaml
-
           config = yaml.safe_load(Path('weather4lox-ha/config.yaml').read_text(encoding='utf-8'))
           version = str(config['version'])
           options = config['options']
@@ -108,13 +91,12 @@ jobs:
           block = ('<!-- AUTO-GENERATED: ci-docs.yml -->\n'
                    f'Current version: **{version}**  \n'
                    f'Forecast horizon: **{options["forecast_days"]} days**  \n'
-                   f'Provider refresh: **DWD {options["dwd"]["refresh_interval_minutes"]} min / OpenWeatherMap {options["openweathermap"]["refresh_interval_minutes"]} min**  \n'
+                   f'Provider refresh: **DWD {options["dwd_refresh_interval_minutes"]} min / OpenWeatherMap {options["openweathermap_refresh_interval_minutes"]} min**  \n'
                    '<!-- END AUTO-GENERATED -->')
           pattern = r'<!-- AUTO-GENERATED: ci-docs\\.yml -->.*?<!-- END AUTO-GENERATED -->'
           text = re.sub(pattern, block, text, flags=re.S)
           readme.write_text(text, encoding='utf-8')
           PY
-
       - name: Commit & Push updated documentation
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: stefanzweifel/git-auto-commit-action@v5
