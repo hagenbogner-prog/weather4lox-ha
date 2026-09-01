@@ -16,14 +16,12 @@ ports_description:
   6066/tcp: Loxone Weather Service HTTP API
 options:
   weather_provider: openweathermap
-  dwd:
-    weather_entity: auto
-    refresh_interval_minutes: 120
-    cache_validity_hours: 24
-  openweathermap:
-    weather_entity: auto
-    refresh_interval_minutes: 60
-    cache_validity_hours: 48
+  dwd_weather_entity: auto
+  dwd_refresh_interval_minutes: 120
+  dwd_cache_validity_hours: 24
+  openweathermap_weather_entity: auto
+  openweathermap_refresh_interval_minutes: 60
+  openweathermap_cache_validity_hours: 48
   forecast_days: 7
   fallback_to_cache: true
   mqtt_entities: false
@@ -38,14 +36,12 @@ options:
   debug_logging: true
 schema:
   weather_provider: list(openweathermap|dwd)
-  dwd:
-    weather_entity: str
-    refresh_interval_minutes: int
-    cache_validity_hours: int
-  openweathermap:
-    weather_entity: str
-    refresh_interval_minutes: int
-    cache_validity_hours: int
+  dwd_weather_entity: str
+  dwd_refresh_interval_minutes: int
+  dwd_cache_validity_hours: int
+  openweathermap_weather_entity: str
+  openweathermap_refresh_interval_minutes: int
+  openweathermap_cache_validity_hours: int
   forecast_days: int
   fallback_to_cache: bool
   mqtt_entities: bool
