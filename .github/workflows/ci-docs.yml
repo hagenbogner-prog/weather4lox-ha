@@ -38,6 +38,8 @@ jobs:
           test -f weather4lox-ha/server.py
           test -f weather4lox-ha/loxone_format2.py
           test -f weather4lox-ha/protocol/loxone_gen1.py
+          test -f weather4lox-ha/providers.py
+          test -f weather4lox-ha/ha_entities.py
           test -f weather4lox-ha/icon.png
           test -f weather4lox-ha/logo.png
           test -f repository.yaml
@@ -58,14 +60,17 @@ jobs:
 
           config = yaml.safe_load(Path('weather4lox-ha/config.yaml').read_text(encoding='utf-8'))
           assert config['name'] == 'Weather4Lox HA'
-          assert config['version'] == '0.4.3'
+          assert config['version'] == '0.5.0'
           assert config['slug'] == 'weather4lox-ha'
           assert config['arch'] == ['amd64', 'aarch64']
           assert config['ports']['6066/tcp'] == 6066
-          assert int(config['options']['target_hours']) == 181
-          assert int(config['options']['refresh_interval_minutes']) == 30
-          assert config['options']['synthetic_fallback'] is False
-          assert config['options']['weather_provider'] == 'openweathermap'
+          assert config['options']['weather_provider'] in ('dwd', 'openweathermap')
+          assert set(config['schema']['weather_provider'].split('(')[1].rstrip(')').split('|')) == {'dwd', 'openweathermap'}
+          assert config['options']['forecast_days'] == 7
+          assert config['options']['dwd']['refresh_interval_minutes'] == 120
+          assert config['options']['openweathermap']['refresh_interval_minutes'] == 60
+          assert config['options']['dwd']['cache_validity_hours'] == 24
+          assert config['options']['openweathermap']['cache_validity_hours'] == 48
           assert config['options']['location_city'] == 'Wertingen'
           assert float(config['options']['latitude']) == 48.56
           assert float(config['options']['longitude']) == 10.681
@@ -97,14 +102,13 @@ jobs:
 
           config = yaml.safe_load(Path('weather4lox-ha/config.yaml').read_text(encoding='utf-8'))
           version = str(config['version'])
-          hours = int(config['options']['target_hours'])
-          refresh = int(config['options']['refresh_interval_minutes'])
+          options = config['options']
           readme = Path('README.md')
           text = readme.read_text(encoding='utf-8')
           block = ('<!-- AUTO-GENERATED: ci-docs.yml -->\n'
                    f'Current version: **{version}**  \n'
-                   f'Forecast target: **{hours} hours**  \n'
-                   f'Cache refresh: **{refresh} minutes**  \n'
+                   f'Forecast horizon: **{options["forecast_days"]} days**  \n'
+                   f'Provider refresh: **DWD {options["dwd"]["refresh_interval_minutes"]} min / OpenWeatherMap {options["openweathermap"]["refresh_interval_minutes"]} min**  \n'
                    '<!-- END AUTO-GENERATED -->')
           pattern = r'<!-- AUTO-GENERATED: ci-docs\\.yml -->.*?<!-- END AUTO-GENERATED -->'
           text = re.sub(pattern, block, text, flags=re.S)
