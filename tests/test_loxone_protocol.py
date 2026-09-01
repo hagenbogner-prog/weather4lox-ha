@@ -7,6 +7,7 @@ from protocol.loxone_gen1 import (
     FORMAT2_COLUMNS,
     FORMAT2_HEADER,
     DEFAULT_LOXONE_PICTO,
+    WEATHER_COLUMNS,
     picto_for_condition,
     validate_payload,
     validate_row,
@@ -18,16 +19,14 @@ def test_format2_header_has_29_columns():
     assert len(FORMAT2_HEADER.split(";")) == FORMAT2_COLUMNS
 
 
-def test_format2_row_preserves_empty_sun_fields():
+def test_hourly_row_has_19_columns():
     row = ";".join([
-        "0", "Home Assistant", "10.681", "48.560", "450", "Deutschland",
-        "Europe/Berlin", "2", "", "", "31.08.2026", "Mon", "18:00",
-        "23.1", "23.1", "3.7", "225", "0", "80", "0", "0", "0.0",
-        "0", "0.0", "1016.0", "50", "0", "5", "0",
+        "31.08.2026", "Mon", "18", "23.1", "23.1", "3.7", "225", "0",
+        "80", "0", "0", "0.0", "0", "0.0", "1016", "50", "0", "5", "0",
     ])
     assert validate_row(row)
-    assert len(row.split(";")) == 29
-    assert row.split(";")[8:10] == ["", ""]
+    assert len(row.split(";")) == WEATHER_COLUMNS
+    assert row.split(";")[0:3] == ["31.08.2026", "Mon", "18"]
 
 
 def test_unknown_condition_uses_safe_default_picto():
