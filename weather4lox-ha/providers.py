@@ -1,5 +1,6 @@
 """Provider-specific policies used by the cache scheduler and diagnostics."""
 from dataclasses import dataclass
+import json
 
 
 @dataclass(frozen=True)
@@ -24,26 +25,37 @@ def get_profile(provider: str) -> ProviderProfile:
     return PROFILES[provider]
 
 
+def _options(options: dict | None) -> dict:
+    if options is not None:
+        return options
+    try:
+        with open("/data/options.json", encoding="utf-8") as f:
+            value = json.load(f)
+            return value if isinstance(value, dict) else {}
+    except Exception:
+        return {}
+
+
 def _section(provider: str, options: dict) -> dict:
     section = options.get(provider, {})
     return section if isinstance(section, dict) else {}
 
 
 def forecast_days(provider: str, options: dict | None = None) -> int:
-    options = options or {}
+    options = _options(options)
     value = int(options.get("forecast_days", 7))
     return max(1, min(value, get_profile(provider).max_requested_days))
 
 
 def refresh_minutes(provider: str, options: dict | None = None) -> int:
-    options = options or {}
+    options = _options(options)
     profile = get_profile(provider)
     value = int(_section(provider, options).get("refresh_interval_minutes", profile.default_refresh_minutes))
     return max(30, min(value, 1440))
 
 
 def cache_ttl_minutes(provider: str, options: dict | None = None) -> int:
-    options = options or {}
+    options = _options(options)
     profile = get_profile(provider)
     value = int(_section(provider, options).get("cache_validity_hours", profile.default_cache_ttl_minutes // 60))
     horizon_minutes = forecast_days(provider, options) * 24 * 60
