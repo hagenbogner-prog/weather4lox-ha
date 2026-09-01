@@ -1,10 +1,4 @@
-"""Provider-specific forecast strategies for Weather4Lox HA.
-
-The app deliberately consumes Home Assistant weather entities instead of
-calling provider APIs directly.  DWD and OpenWeatherMap nevertheless get
-separate policies because their HA forecast capabilities and upstream API
-strategies differ.
-"""
+"""Provider-specific policies used by the cache scheduler and diagnostics."""
 from dataclasses import dataclass
 
 
@@ -19,47 +13,42 @@ class ProviderProfile:
 
 
 PROFILES = {
-    "dwd": ProviderProfile(
-        name="dwd",
-        forecast_type="hourly",
-        default_refresh_minutes=120,
-        default_cache_ttl_minutes=1440,
-        max_requested_days=7,
-        allow_daily_fallback=True,
-    ),
-    "openweathermap": ProviderProfile(
-        name="openweathermap",
-        forecast_type="hourly",
-        default_refresh_minutes=60,
-        default_cache_ttl_minutes=2880,
-        max_requested_days=7,
-        allow_daily_fallback=True,
-    ),
+    "dwd": ProviderProfile("dwd", "hourly", 120, 1440, 7, True),
+    "openweathermap": ProviderProfile("openweathermap", "hourly", 60, 2880, 7, True),
 }
 
 
 def get_profile(provider: str) -> ProviderProfile:
-    try:
-        return PROFILES[provider]
-    except KeyError as exc:
-        raise ValueError(
-            f"Unsupported provider '{provider}'. Select exactly one of: dwd, openweathermap"
-        ) from exc
+    if provider not in PROFILES:
+        raise ValueError("Unsupported provider; select exactly one of: dwd, openweathermap")
+    return PROFILES[provider]
 
 
-def requested_hours(options: dict) -> int:
-    days = int(options.get("forecast_days", 2))
-    days = max(1, min(days, 7))
-    return days * 24
+def _section(provider: str, options: dict) -> dict:
+    section = options.get(provider, {})
+    return section if isinstance(section, dict) else {}
 
 
-def refresh_minutes(options: dict, profile: ProviderProfile) -> int:
-    value = int(options.get("refresh_interval_minutes", profile.default_refresh_minutes))
+def forecast_days(provider: str, options: dict | None = None) -> int:
+    options = options or {}
+    value = int(options.get("forecast_days", 7))
+    return max(1, min(value, get_profile(provider).max_requested_days))
+
+
+def refresh_minutes(provider: str, options: dict | None = None) -> int:
+    options = options or {}
+    profile = get_profile(provider)
+    value = int(_section(provider, options).get("refresh_interval_minutes", profile.default_refresh_minutes))
     return max(30, min(value, 1440))
 
 
-def cache_ttl_minutes(options: dict, profile: ProviderProfile) -> int:
-    value = int(options.get("cache_ttl_minutes", profile.default_cache_ttl_minutes))
-    # Cache validity may not exceed the configured forecast horizon.
-    max_ttl = requested_hours(options) * 60
-    return max(60, min(value, max_ttl))
+def cache_ttl_minutes(provider: str, options: dict | None = None) -> int:
+    options = options or {}
+    profile = get_profile(provider)
+    value = int(_section(provider, options).get("cache_validity_hours", profile.default_cache_ttl_minutes // 60))
+    horizon_minutes = forecast_days(provider, options) * 24 * 60
+    return max(24 * 60, min(value * 60, horizon_minutes))
+
+
+def requested_hours(provider: str, options: dict | None = None) -> int:
+    return forecast_days(provider, options) * 24
