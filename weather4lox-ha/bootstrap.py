@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Start Weather4Lox HA with the documented Loxone Gen 1 format=2 serializer."""
+"""Bootstrap the Weather4Lox HA app and its independent cache refresher."""
 
 from datetime import datetime
 from threading import Event, Thread
@@ -8,7 +8,7 @@ from zoneinfo import ZoneInfo
 import loxone_format2
 import server
 
-VERSION = "0.4.3"
+VERSION = "0.5.0"
 server.VERSION = VERSION
 server.Handler.server_version = f"Weather4LoxHA/{VERSION}"
 
@@ -27,13 +27,14 @@ loxone_format2.install(server)
 
 
 def refresh_loop(stop: Event) -> None:
-    """Refresh the local forecast cache independently of Loxone requests."""
+    """Refresh immediately, then retry at the selected provider interval."""
     while not stop.is_set():
         try:
             server.obtain_forecast(force=True)
         except Exception as exc:
             server.log.warning("Scheduled forecast refresh failed: %s", exc)
-        interval = max(5, int(server.opts().get("refresh_interval_minutes", 30))) * 60
+        provider = server.opts().get("weather_provider", "openweathermap")
+        interval = max(30, server.refresh_minutes(provider, server.opts())) * 60
         stop.wait(interval)
 
 
