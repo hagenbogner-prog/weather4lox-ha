@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
-"""Start Weather4Lox HA with the documented Loxone Gen 1 format=2 serializer."""
+"""Bootstrap the Weather4Lox HA app and its independent cache refresher."""
 
+import os
 from datetime import datetime
 from threading import Event, Thread
+from urllib.parse import urlparse
 from zoneinfo import ZoneInfo
 
 import loxone_format2
 import server
 
-VERSION = "0.4.3"
+VERSION = "0.5.0"
 server.VERSION = VERSION
 server.Handler.server_version = f"Weather4LoxHA/{VERSION}"
 
@@ -26,14 +28,55 @@ server.local_dt = local_dt
 loxone_format2.install(server)
 
 
+def provider_config(provider, options=None):
+    options = options or server.opts()
+    prefix = "dwd" if provider == "dwd" else "openweathermap"
+    return {
+        "weather_entity": options.get(f"{prefix}_weather_entity", "auto"),
+        "refresh_interval_minutes": options.get(f"{prefix}_refresh_interval_minutes"),
+        "cache_validity_hours": options.get(f"{prefix}_cache_validity_hours"),
+    }
+
+
+server.provider_config = provider_config
+
+_original_do_get = server.Handler.do_GET
+
+
+def control_do_get(self):
+    path = urlparse(self.path).path.rstrip("/")
+    if path == "/control/clear-cache":
+        try:
+            with server.lock:
+                server.cache = None
+                if os.path.exists(server.CACHE_FILE):
+                    os.remove(server.CACHE_FILE)
+            self.json({"ok": True, "status": "🔴 Error", "message": "Cache cleared"})
+        except Exception as exc:
+            self.json({"ok": False, "error": str(exc)}, 500)
+        return
+    if path == "/control/refresh":
+        try:
+            forecast, source, meta = server.obtain_forecast(force=True)
+            self.json({"ok": True, "source": source, "entries": len(forecast), "metadata": meta})
+        except Exception as exc:
+            self.json({"ok": False, "error": str(exc)}, 500)
+        return
+    _original_do_get(self)
+
+
+server.Handler.do_GET = control_do_get
+
+
 def refresh_loop(stop: Event) -> None:
-    """Refresh the local forecast cache independently of Loxone requests."""
+    """Refresh immediately, then retry at the selected provider interval."""
     while not stop.is_set():
         try:
             server.obtain_forecast(force=True)
         except Exception as exc:
             server.log.warning("Scheduled forecast refresh failed: %s", exc)
-        interval = max(5, int(server.opts().get("refresh_interval_minutes", 30))) * 60
+        provider = server.opts().get("weather_provider", "openweathermap")
+        interval = max(30, server.refresh_minutes(provider, server.opts())) * 60
         stop.wait(interval)
 
 

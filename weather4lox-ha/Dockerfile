@@ -13,6 +13,8 @@ RUN apk add --no-cache python3
 COPY run.sh /run.sh
 COPY server.py /server.py
 COPY bootstrap.py /bootstrap.py
+COPY providers.py /providers.py
+COPY ha_entities.py /ha_entities.py
 COPY loxone_format2.py /loxone_format2.py
 COPY protocol /protocol
 
