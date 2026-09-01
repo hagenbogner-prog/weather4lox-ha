@@ -1,5 +1,5 @@
 name: Weather4Lox HA
-version: "0.4.3"
+version: "0.5.0"
 slug: weather4lox-ha
 description: Loxone Gen 1 Weather Service emulator for Home Assistant
 url: https://github.com/hagenbogner-prog/weather4lox-ha
@@ -16,19 +16,18 @@ ports_description:
   6066/tcp: Loxone Weather Service HTTP API
 options:
   weather_provider: openweathermap
-  weather_entity: weather.openweathermap
-  dwd_weather_entity: weather.wertingen
-  custom_weather_entity: weather.openweathermap
-  temperature_sensor: sensor.openweathermap_temperatur
-  feels_like_sensor: sensor.openweathermap_gefuhlte_temperatur
-  humidity_sensor: sensor.openweathermap_luftfeuchtigkeit
-  pressure_sensor: sensor.openweathermap_druck
-  cloud_sensor: sensor.openweathermap_bewolkung
-  wind_speed_sensor: sensor.openweathermap_windgeschwindigkeit
-  wind_gust_sensor: sensor.openweathermap_windboengeschwindigkeit
-  wind_direction_sensor: sensor.openweathermap_windrichtung
-  rain_sensor: sensor.openweathermap_regenintensitat
-  snow_sensor: sensor.openweathermap_schneeintensitat
+  dwd:
+    weather_entity: auto
+    refresh_interval_minutes: 120
+    cache_validity_hours: 24
+  openweathermap:
+    weather_entity: auto
+    refresh_interval_minutes: 60
+    cache_validity_hours: 48
+  forecast_days: 7
+  fallback_to_cache: true
+  mqtt_entities: false
+  mqtt_discovery_prefix: homeassistant
   location_city: Wertingen
   country: Deutschland
   country_code: DE
@@ -36,28 +35,21 @@ options:
   longitude: 10.681
   elevation_m: 450
   timezone: Europe/Berlin
-  target_hours: 181
-  refresh_interval_minutes: 30
-  cache_ttl_minutes: 60
-  fallback_to_cache: true
-  interpolate_missing_hours: true
-  synthetic_fallback: false
   debug_logging: true
 schema:
-  weather_provider: list(openweathermap|dwd|custom)
-  weather_entity: str
-  dwd_weather_entity: str
-  custom_weather_entity: str
-  temperature_sensor: str
-  feels_like_sensor: str
-  humidity_sensor: str
-  pressure_sensor: str
-  cloud_sensor: str
-  wind_speed_sensor: str
-  wind_gust_sensor: str
-  wind_direction_sensor: str
-  rain_sensor: str
-  snow_sensor: str
+  weather_provider: list(openweathermap|dwd)
+  dwd:
+    weather_entity: str
+    refresh_interval_minutes: int
+    cache_validity_hours: int
+  openweathermap:
+    weather_entity: str
+    refresh_interval_minutes: int
+    cache_validity_hours: int
+  forecast_days: int
+  fallback_to_cache: bool
+  mqtt_entities: bool
+  mqtt_discovery_prefix: str
   location_city: str
   country: str
   country_code: str
@@ -65,10 +57,4 @@ schema:
   longitude: float
   elevation_m: int
   timezone: str
-  target_hours: int
-  refresh_interval_minutes: int
-  cache_ttl_minutes: int
-  fallback_to_cache: bool
-  interpolate_missing_hours: bool
-  synthetic_fallback: bool
   debug_logging: bool
