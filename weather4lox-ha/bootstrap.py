@@ -27,6 +27,19 @@ def local_dt(value):
 server.local_dt = local_dt
 loxone_format2.install(server)
 
+
+def provider_config(provider, options=None):
+    options = options or server.opts()
+    prefix = "dwd" if provider == "dwd" else "openweathermap"
+    return {
+        "weather_entity": options.get(f"{prefix}_weather_entity", "auto"),
+        "refresh_interval_minutes": options.get(f"{prefix}_refresh_interval_minutes"),
+        "cache_validity_hours": options.get(f"{prefix}_cache_validity_hours"),
+    }
+
+
+server.provider_config = provider_config
+
 _original_do_get = server.Handler.do_GET
 
 
