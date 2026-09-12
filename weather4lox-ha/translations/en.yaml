@@ -1,0 +1,60 @@
+configuration:
+  weather_provider:
+    name: Weather provider
+    description: Select the Home Assistant weather integration whose forecast Weather4Lox should provide to Loxone.
+  dwd_weather_entity:
+    name: DWD weather entity
+    description: Home Assistant weather.* entity for DWD. With "auto", Weather4Lox tries to detect a matching entity automatically.
+  dwd_refresh_interval_minutes:
+    name: DWD refresh interval
+    description: Time in minutes between automatic DWD forecast refreshes.
+  dwd_cache_validity_hours:
+    name: DWD cache validity
+    description: Maximum validity of the last successful DWD forecast in hours.
+  openweathermap_weather_entity:
+    name: OpenWeatherMap weather entity
+    description: Home Assistant weather.* entity for OpenWeatherMap. With "auto", Weather4Lox tries to detect a matching entity automatically.
+  openweathermap_refresh_interval_minutes:
+    name: OpenWeatherMap refresh interval
+    description: Time in minutes between automatic OpenWeatherMap forecast refreshes.
+  openweathermap_cache_validity_hours:
+    name: OpenWeatherMap cache validity
+    description: Maximum validity of the last successful OpenWeatherMap forecast in hours.
+  forecast_days:
+    name: Forecast days
+    description: Requested forecast horizon from 1 to 7 days. Actual coverage depends on the provider.
+  fallback_to_cache:
+    name: Use cache fallback
+    description: Use the last still-valid forecast during a temporary provider failure. Expired forecasts are not returned as valid fallback data.
+  mqtt_entities:
+    name: Publish MQTT entities
+    description: Optionally publish Weather4Lox sensors through MQTT Discovery. This is not required for Loxone operation.
+  mqtt_discovery_prefix:
+    name: MQTT discovery prefix
+    description: MQTT Discovery prefix, normally "homeassistant".
+  location_city:
+    name: Station name
+    description: Optional station name for Loxone metadata. This value is not displayed on the Weather4Lox diagnostics page.
+  country:
+    name: Country
+    description: Optional country value for Loxone station metadata.
+  country_code:
+    name: Country code
+    description: Optional two-character country code for metadata.
+  latitude:
+    name: Latitude
+    description: Fallback latitude used when the Loxone request does not contain coordinates. It is not displayed on the diagnostics page.
+  longitude:
+    name: Longitude
+    description: Fallback longitude used when the Loxone request does not contain coordinates. It is not displayed on the diagnostics page.
+  elevation_m:
+    name: Elevation
+    description: Fallback elevation in meters used when the Loxone request does not contain an elevation value.
+  timezone:
+    name: Time zone
+    description: Time zone used for local date and time values in the Loxone response.
+  debug_logging:
+    name: Debug logging
+    description: Enable additional technical log messages for troubleshooting.
+network:
+  6066/tcp: Local Loxone Weather Service HTTP port
