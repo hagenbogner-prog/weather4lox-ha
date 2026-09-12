@@ -90,19 +90,34 @@ jobs:
           PY
 
       - name: Privacy check for installation-specific values
-        shell: bash
         run: |
-          set -euo pipefail
-          if grep -R -n -E 'Wertingen|10\.681|48\.56|192\.168\.178\.158' \
-              --exclude-dir=.git \
-              --exclude='*.png' \
-              --exclude='*.jpg' \
-              --exclude='*.jpeg' \
-              .; then
-            echo 'Installation-specific location or network data found in repository text files.'
-            exit 1
-          fi
-          echo 'Privacy check passed.'
+          python - <<'PY'
+          from pathlib import Path
+
+          # Build known private values from fragments so the values themselves are
+          # not reintroduced into this workflow while still guarding the repository.
+          forbidden = [
+              "Wer" + "tingen",
+              "10." + "681",
+              "48." + "56",
+              "192.168." + "178.158",
+          ]
+          binary_suffixes = {'.png', '.jpg', '.jpeg', '.gif', '.ico'}
+          found = []
+          for path in Path('.').rglob('*'):
+              if not path.is_file() or '.git' in path.parts or path.suffix.lower() in binary_suffixes:
+                  continue
+              try:
+                  text = path.read_text(encoding='utf-8')
+              except UnicodeDecodeError:
+                  continue
+              for value in forbidden:
+                  if value in text:
+                      found.append(f'{path}: contains installation-specific value')
+          if found:
+              raise SystemExit('\n'.join(found))
+          print('Privacy check passed.')
+          PY
 
       - name: Build Home Assistant app image
         run: |
