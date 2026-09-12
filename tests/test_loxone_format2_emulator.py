@@ -43,18 +43,18 @@ class Core:
     @staticmethod
     def opts():
         return {
-            "location_city": "Wertingen",
-            "country": "Deutschland",
-            "longitude": 10.681,
-            "latitude": 48.56,
-            "elevation_m": 450,
-            "timezone": "Europe/Berlin",
+            "location_city": "Home",
+            "country": "",
+            "longitude": 0.0,
+            "latitude": 0.0,
+            "elevation_m": 0,
+            "timezone": "UTC",
         }
 
 
 def test_format2_has_29_header_10_station_and_19_hourly_columns():
     forecast = [{
-        "datetime": "2026-08-31T18:00:00+02:00",
+        "datetime": "2026-08-31T18:00:00+00:00",
         "temperature": 23.1,
         "apparent_temperature": 23.1,
         "humidity": 50,
@@ -67,7 +67,7 @@ def test_format2_has_29_header_10_station_and_19_hourly_columns():
         "precipitation_probability": 0,
     }]
     payload, validation = loxone_format2.make_payload(
-        Core(), forecast, {"coord": ["10.681,48.56"], "asl": ["450"]}, diagnostic=True
+        Core(), forecast, {"coord": ["0,0"], "asl": ["0"]}, diagnostic=True
     )
 
     assert validation["ok"] is True
