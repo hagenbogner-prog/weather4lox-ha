@@ -1,114 +1,147 @@
 # Weather4Lox HA
 
-Home Assistant app that emulates the Loxone Gen 1 Weather Service on TCP port 6066. It reads the selected Home Assistant weather entity and serves the `format=2` response expected by a Loxone Miniserver.
+Weather4Lox HA is a Home Assistant app that provides Home Assistant weather forecasts to a Loxone Miniserver Gen 1 using the local Loxone Weather Service protocol on TCP port `6066`.
 
-The protocol follows the Local Weather Service Emulator architecture described by SmartHome.Exposed: DNS redirection remains external to the app, the app refreshes and stores a local forecast cache, and Loxone reads the local service.
-
-Reference: https://smarthome.exposed/local-weather-service-emulator/
+It reads a selected Home Assistant `weather.*` entity, maintains a provider-specific forecast cache, validates the generated Loxone Format 2 payload, and serves the result locally to Loxone.
 
 ## Architecture
 
 ```text
 Loxone Miniserver Gen 1
         |
-        | weather.loxone.com -> Home Assistant via dnsmasq
+        | weather.loxone.com -> Home Assistant via DNS redirection
         | HTTP :6066 /forecast/
         v
 Weather4Lox HA app
         |
-        | Home Assistant Supervisor API
+        | Home Assistant API
         v
 Selected HA weather entity
   ├─ OpenWeatherMap
   └─ DWD
         |
         v
-normalized forecast -> atomic cache -> Loxone format=2
+forecast -> cache -> Loxone Format 2
 ```
 
-This repository contains only the Home Assistant app. There is no LoxBerry plugin, LoxBerry runtime, or LoxBerry-specific endpoint.
+This repository contains only the Home Assistant app. It does not require LoxBerry.
 
-## Loxone endpoint
+## Features
+
+- OpenWeatherMap and DWD provider support
+- automatic or manual Home Assistant weather entity selection
+- provider-specific refresh intervals and cache validity
+- requested forecast horizon from 1 to 7 days
+- atomic cache replacement after successful refreshes
+- no synthetic forecast generation during normal operation
+- Loxone Format 2 validation
+- Home Assistant Ingress status and diagnostics web interface
+- clear error hints for missing or unsupported forecast data
+- manual forecast check from the web interface
+
+## Home Assistant installation
+
+Add this GitHub repository as a Home Assistant app repository:
 
 ```text
-http://HOME_ASSISTANT_IP:6066/forecast/?user=loxone_TEST&coord=10.681,48.56&asl=450&format=2&new_api=1
+https://github.com/hagenbogner-prog/weather4lox-ha
 ```
 
-The response contains:
+Then install **Weather4Lox HA** from the Home Assistant App Store.
 
-- a 29-field `<mb_metadata>` header
-- a 10-field station metadata line
-- 19 fields per forecast row
-- numeric Loxone pictograms
-- local date/time and UTC offset
-- temperature, feels-like, wind, clouds, precipitation, pressure and humidity where supplied by Home Assistant
+## Status & diagnostics
 
-## Providers and forecast coverage
+Starting with version 0.6.0, the app provides a Home Assistant Ingress web interface. Open the Weather4Lox app and select **Open Web UI**.
+
+The dashboard shows:
+
+- overall status
+- selected provider
+- selected weather entity
+- forecast entry count and range
+- cache state and age
+- last successful refresh
+- Loxone Format 2 validation state
+- Loxone request count
+- actionable configuration errors
+
+The diagnostics interface intentionally does not display configured location names, coordinates, access tokens, or other private settings.
+
+## Providers
 
 Exactly one provider is active: `openweathermap` or `dwd`.
 
-The app does **not** call the provider API directly. It consumes the selected `weather.*` entity through Home Assistant. With `weather_entity: auto`, it searches existing weather entities using provider attribution/name hints; an explicit entity ID can always be configured.
+Weather4Lox does not call the provider API directly. It consumes the selected Home Assistant `weather.*` entity through Home Assistant.
 
-The configured forecast horizon is 1–7 days. The app never invents missing weather data to reach that target: the cache records the requested horizon and the actual number/range of forecast entries returned by Home Assistant. A successful refresh completely replaces the previous cache; a failed refresh keeps the last successful cache for fallback.
+### OpenWeatherMap
+
+Weather4Lox requires a forecast-capable OpenWeatherMap mode. Modes such as `forecast` or `v3.0` can provide forecast data. The `current` mode provides current conditions only and therefore cannot supply the forecast Weather4Lox needs.
+
+### DWD
+
+DWD forecast data can be selected automatically when a matching Home Assistant weather entity is available, or an entity ID can be configured manually.
+
+## Cache behavior
+
+A successful refresh fully replaces the previous forecast cache. If a refresh fails, Weather4Lox may use the last matching cached forecast only while it is still valid and still covers the current date.
+
+Expired forecast data is not presented to Loxone as a valid fallback.
 
 Provider defaults:
 
-| Provider | Refresh | Cache validity | Max requested horizon |
-|---|---:|---:|---:|
-| DWD | 120 min | 24 h | 7 days |
-| OpenWeatherMap | 60 min | 48 h | 7 days |
+| Provider | Refresh | Cache validity |
+|---|---:|---:|
+| DWD | 120 min | 24 h |
+| OpenWeatherMap | 60 min | 48 h |
 
-Cache validity is bounded by the configured forecast horizon. Refresh is performed immediately at app startup and then at the provider-specific interval.
+The requested forecast horizon is 1–7 days. Actual coverage depends on the Home Assistant provider. Weather4Lox does not invent missing forecast rows.
 
-## Cache and controls
+## Loxone endpoint
 
-`/status` exposes provider, selected entity, cache age, requested/actual coverage, refresh interval, last attempt/success/error and validation state.
-
-Manual controls:
+The local service is available on port `6066`:
 
 ```text
+http://HOME_ASSISTANT_IP:6066/forecast/?user=loxone&coord=longitude,latitude&asl=elevation&format=2&new_api=1
+```
+
+The response is validated for:
+
+- 29 metadata fields
+- 10 station metadata fields
+- 19 fields per forecast row
+- supported numeric Loxone pictograms
+- expected Format 2 structure
+
+## Diagnostics endpoints
+
+```text
+GET /health
+GET /status
+GET /raw
+GET /debug/forecast
+GET /debug/loxone/validate
 GET /control/refresh
 GET /control/clear-cache
 ```
 
-Clearing the cache deliberately removes the fallback. A failed manual or scheduled refresh does not destroy an existing cache.
+## Documentation
 
-## Home Assistant entities
-
-The app uses the same normalized data for Loxone and can optionally publish sensor entities through MQTT Discovery when the Home Assistant MQTT integration is installed. Loxone operation does not depend on MQTT.
-
-## Default location
-
-- Wertingen, Germany
-- latitude `48.56`
-- longitude `10.681`
-- elevation `450 m`
-- timezone `Europe/Berlin`
-
-The Loxone request's `coord` and `asl` values are used in the station metadata response.
-
-## Testing
-
-```bash
-curl http://HOME_ASSISTANT_IP:6066/health
-curl http://HOME_ASSISTANT_IP:6066/status
-curl "http://HOME_ASSISTANT_IP:6066/forecast/?user=loxone_TEST&coord=10.681,48.56&asl=450&format=2&new_api=1"
-curl http://HOME_ASSISTANT_IP:6066/control/refresh
-curl http://HOME_ASSISTANT_IP:6066/control/clear-cache
-```
-
-Diagnostics are also available at `/raw`, `/debug/forecast` and `/debug/loxone/validate`.
+The Home Assistant app includes dedicated Info, Documentation, Configuration, Log, and Web UI views. See `weather4lox-ha/DOCS.md` for detailed setup and troubleshooting information.
 
 ## Development
 
-CI compiles the Python sources, validates the Home Assistant app configuration, builds the Docker image and runs the test suite. The project does not create ZIP packages.
+CI compiles the Python sources, runs the test suite, validates configuration files, and builds the app image for supported architectures.
+
+## Privacy
+
+Public documentation and example configuration intentionally use neutral placeholders. Do not commit personal coordinates, local IP addresses, access tokens, or other private installation details to this repository.
 
 ## License
 
 MIT
 
 <!-- AUTO-GENERATED: ci-docs.yml -->
-Current version: **0.5.0**  
+Current version: **0.6.0**  
 Forecast horizon: **1–7 days**  
 Provider refresh: **DWD 120 min / OpenWeatherMap 60 min**  
 <!-- END AUTO-GENERATED -->
