@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Bootstrap the Weather4Lox HA app and its independent cache refresher."""
+"""Bootstrap the Weather4Lox HA app, cache refresher, and ingress diagnostics UI."""
 
 import os
 from datetime import datetime
@@ -9,14 +9,15 @@ from zoneinfo import ZoneInfo
 
 import loxone_format2
 import server
+import webui
 
-VERSION = "0.5.0"
+VERSION = "0.6.0"
 server.VERSION = VERSION
 server.Handler.server_version = f"Weather4LoxHA/{VERSION}"
 
 
 def configured_tz():
-    return ZoneInfo(server.opts().get("timezone", "Europe/Berlin"))
+    return ZoneInfo(server.opts().get("timezone", "UTC"))
 
 
 def local_dt(value):
@@ -39,6 +40,28 @@ def provider_config(provider, options=None):
 
 
 server.provider_config = provider_config
+
+# Never use an expired cache as a successful Loxone fallback. A cache fallback is
+# only useful while the configured TTL is valid and the forecast still covers
+# the current local date.
+_original_obtain_forecast = server.obtain_forecast
+
+
+def obtain_forecast(force=False):
+    forecast, source, meta = _original_obtain_forecast(force=force)
+    if source == "cache":
+        provider = server.opts().get("weather_provider", "openweathermap")
+        entity = None
+        try:
+            entity = server.selected_entity(provider)
+        except Exception:
+            pass
+        if not webui.cache_is_usable(server, meta, provider, entity):
+            raise RuntimeError("Cached forecast is expired and cannot be used as a Loxone fallback")
+    return forecast, source, meta
+
+
+server.obtain_forecast = obtain_forecast
 
 _original_do_get = server.Handler.do_GET
 
@@ -83,6 +106,7 @@ def refresh_loop(stop: Event) -> None:
 def main() -> None:
     stop = Event()
     Thread(target=refresh_loop, args=(stop,), name="forecast-refresh", daemon=True).start()
+    webui.start(server)
     try:
         server.main()
     finally:
