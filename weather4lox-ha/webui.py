@@ -9,7 +9,6 @@ from threading import Thread
 
 INGRESS_HOST = "0.0.0.0"
 INGRESS_PORT = 8099
-_ALLOWED_INGRESS_CLIENTS = {"172.30.32.2", "127.0.0.1", "::1"}
 
 
 def _iso(value):
@@ -75,6 +74,20 @@ def _friendly_error(provider, entity, raw_error, cache_state):
             "code": "forecast_expired",
             "title": "Wettervorhersage ist abgelaufen",
             "message": "Der gespeicherte Forecast ist nicht mehr aktuell. Weather4Lox liefert abgelaufene Vorhersagedaten nicht als gültigen Fallback an Loxone aus.",
+        }
+
+    if cache_state == "mismatch":
+        return {
+            "code": "cache_mismatch",
+            "title": "Cache passt nicht zur aktuellen Konfiguration",
+            "message": "Provider oder Wetterentität wurden geändert. Führe 'Jetzt prüfen' aus, damit Weather4Lox einen neuen Forecast für die aktuelle Konfiguration lädt.",
+        }
+
+    if cache_state == "empty":
+        return {
+            "code": "forecast_missing",
+            "title": "Noch keine Wettervorhersage verfügbar",
+            "message": "Weather4Lox hat noch keinen gültigen Forecast gespeichert. Führe 'Jetzt prüfen' aus, um Provider, Wetterentität und Loxone-Ausgabe zu testen.",
         }
 
     return None
@@ -240,6 +253,7 @@ h1 {{ margin:0; font-size:28px; }} .sub {{ color:#aaa; margin-top:5px; }}
 button {{ border:0; border-radius:22px; padding:11px 18px; font-size:14px; font-weight:700; cursor:pointer; background:#03a9d9; color:#001a22; }}
 button.secondary {{ background:#3a3a3a; color:#eee; }} button:disabled {{ opacity:.55; cursor:wait; }}
 footer {{ color:#888; font-size:12px; margin-top:24px; }}
+@media (max-width:640px) {{ header {{ align-items:flex-start; flex-direction:column; }} main {{ padding:16px; }} }}
 @media (prefers-color-scheme:light) {{ body {{ background:#f5f5f5; color:#111; }} .card {{ background:white; border-color:#ddd; }} .sub,.detail,.card h3,footer {{ color:#666; }} button.secondary {{ background:#ddd; color:#111; }} }}
 </style>
 </head>
@@ -285,9 +299,6 @@ def make_handler(server):
         def log_message(self, fmt, *args):
             server.debug("Ingress %s - " + fmt, self.address_string(), *args)
 
-        def _allowed(self):
-            return self.client_address[0] in _ALLOWED_INGRESS_CLIENTS
-
         def _reply(self, body, status=200, content_type="text/html; charset=utf-8"):
             data = body.encode("utf-8")
             self.send_response(status)
@@ -302,9 +313,8 @@ def make_handler(server):
             self._reply(json.dumps(data, ensure_ascii=False, indent=2, default=str), status, "application/json; charset=utf-8")
 
         def do_GET(self):
-            if not self._allowed():
-                self._reply("Forbidden\n", 403, "text/plain; charset=utf-8")
-                return
+            # Port 8099 is not published to the host; Home Assistant Supervisor
+            # provides authentication and proxies this service through Ingress.
             path = self.path.split("?", 1)[0].rstrip("/") or "/"
             if path == "/":
                 self._reply(dashboard_html(server))
