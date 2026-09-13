@@ -17,13 +17,15 @@
 - App description now explains the purpose and major functions of Weather4Lox more clearly.
 - New installations use neutral location defaults instead of project-specific example location data.
 - The Ingress dashboard deliberately omits location names, coordinates, tokens, and other private configuration values.
-- Cached forecasts are only accepted as fallback while the configured cache validity is active and the cached forecast still covers the current date.
+- Cached forecasts are only accepted as fallback while the configured cache validity is active and the exact forecast end time is still in the future.
+- The diagnostics server now rejects requests that were not authenticated and forwarded by Home Assistant Ingress; its sidebar entry is explicitly administrator-only.
 - Weather4Lox version updated to 0.6.0.
 
 ### Fixed
 
 - Improved diagnostics for the case where Home Assistant current weather data exists but the selected weather entity cannot provide `weather.get_forecasts` data.
 - Prevented expired forecast data from being presented as a usable Loxone fallback.
+- Prevented forecasts that ended earlier on the current day from being treated as current.
 - Prepared the app icon asset for correct square rendering in the Home Assistant app UI.
 
 ### Known provider behavior

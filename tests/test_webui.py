@@ -1,6 +1,9 @@
 import sys
 from datetime import datetime, timedelta, timezone
+from http.client import HTTPConnection
+from http.server import ThreadingHTTPServer
 from pathlib import Path
+from threading import Thread
 
 sys.path.insert(0, str(Path(__file__).parents[1] / "weather4lox-ha"))
 
@@ -18,9 +21,14 @@ class FakeServer:
     def __init__(self, cache, error=None):
         self._cache = cache
         self.last_error = error
+        self.check_calls = 0
 
     def opts(self):
         return {"weather_provider": "openweathermap"}
+
+    @staticmethod
+    def debug(*_args):
+        pass
 
     def selected_entity(self, provider):
         assert provider == "openweathermap"
@@ -51,6 +59,17 @@ class FakeServer:
 
     def refresh_minutes(self, provider):
         return 60
+
+    def obtain_forecast(self, force=False):
+        assert force is True
+        self.check_calls += 1
+        return self._cache["forecast"], "live", self._cache
+
+    @staticmethod
+    def make_payload(forecast, query):
+        assert forecast
+        assert query == {"coord": ["0,0"], "asl": ["0"]}
+        return "payload", {"ok": True}
 
     @staticmethod
     def parse_dt(value):
@@ -104,3 +123,49 @@ def test_dashboard_does_not_render_location_configuration():
     assert "latitude" not in page.lower()
     assert "longitude" not in page.lower()
     assert "token" not in page.lower()
+
+
+def request_webui(server, method="GET", path="/", headers=None):
+    httpd = ThreadingHTTPServer(("127.0.0.1", 0), webui.make_handler(server))
+    thread = Thread(target=httpd.serve_forever, daemon=True)
+    thread.start()
+    connection = HTTPConnection("127.0.0.1", httpd.server_port, timeout=2)
+    try:
+        connection.request(method, path, headers=headers or {})
+        response = connection.getresponse()
+        return response.status, response.read().decode("utf-8")
+    finally:
+        connection.close()
+        httpd.shutdown()
+        httpd.server_close()
+        thread.join(timeout=2)
+
+
+def test_webui_rejects_direct_request_without_ingress_identity():
+    cache = make_cache(datetime.now(timezone.utc) + timedelta(hours=6))
+    status, body = request_webui(FakeServer(cache))
+    assert status == 403
+    assert "Ingress required" in body
+
+
+def test_webui_accepts_authenticated_ingress_request():
+    cache = make_cache(datetime.now(timezone.utc) + timedelta(hours=6))
+    status, body = request_webui(
+        FakeServer(cache),
+        headers={webui.INGRESS_USER_HEADER: "home-assistant-user-id"},
+    )
+    assert status == 200
+    assert "Weather4Lox HA" in body
+
+
+def test_check_action_requires_ingress_and_uses_post():
+    cache = make_cache(datetime.now(timezone.utc) + timedelta(hours=6))
+    server = FakeServer(cache)
+    headers = {webui.INGRESS_USER_HEADER: "home-assistant-user-id"}
+
+    get_status, _ = request_webui(server, path="/api/check", headers=headers)
+    post_status, _ = request_webui(server, method="POST", path="/api/check", headers=headers)
+
+    assert get_status == 405
+    assert post_status == 200
+    assert server.check_calls == 1

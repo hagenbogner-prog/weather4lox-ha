@@ -32,7 +32,7 @@ The Loxone service remains independent from the diagnostics UI. Loxone continues
 - Startup performs an immediate refresh, followed by the configured provider interval.
 - A successful refresh completely replaces the previous cache atomically.
 - A failed refresh preserves the last successful cache file.
-- A preserved cache is only served to Loxone while it still matches provider/entity, remains inside its configured TTL, and its forecast range still covers the current date.
+- A preserved cache is only served to Loxone while it still matches provider/entity, remains inside its configured TTL, and its exact forecast end time is still in the future.
 - Expired forecast data is retained for diagnosis but is not presented as a valid Loxone fallback.
 - Cache metadata records provider, entity, timestamps, requested horizon, actual coverage, entry count and status.
 - No synthetic weather forecast is generated in normal operation.

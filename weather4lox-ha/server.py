@@ -247,7 +247,8 @@ def cache_matches(item, provider, entity):
     return bool(item and item.get("provider") == provider and item.get("entity") == entity)
 
 
-def cache_has_current_forecast(item):
+def cache_has_current_forecast(item, now=None):
+    """Return whether the cached forecast ends strictly after ``now``."""
     if not item:
         return False
     end = parse_dt(item.get("forecast_end"))
@@ -261,7 +262,10 @@ def cache_has_current_forecast(item):
         end = max(dates) if dates else None
     if end is None:
         return False
-    return end.astimezone(timezone.utc) >= datetime.now(timezone.utc)
+    current = now or datetime.now(timezone.utc)
+    if current.tzinfo is None:
+        current = current.replace(tzinfo=timezone.utc)
+    return end.astimezone(timezone.utc) > current.astimezone(timezone.utc)
 
 
 def cache_is_valid(item, provider, entity):

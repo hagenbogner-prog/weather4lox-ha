@@ -83,7 +83,7 @@ DWD forecast data can be selected automatically when a matching Home Assistant w
 
 ## Cache behavior
 
-A successful refresh fully replaces the previous forecast cache. If a refresh fails, Weather4Lox may use the last matching cached forecast only while it is still valid and still covers the current date.
+A successful refresh fully replaces the previous forecast cache. If a refresh fails, Weather4Lox may use the last matching cached forecast only while it is inside its configured TTL and its exact forecast end time is still in the future.
 
 Expired forecast data is not presented to Loxone as a valid fallback.
 

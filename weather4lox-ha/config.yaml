@@ -17,6 +17,7 @@ ingress: true
 ingress_port: 8099
 panel_icon: mdi:weather-partly-cloudy
 panel_title: Weather4Lox
+panel_admin: true
 ports:
   6066/tcp: 6066
 ports_description:

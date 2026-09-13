@@ -33,6 +33,8 @@ Use **Check now** to perform an immediate forecast refresh and validate the Loxo
 
 The dashboard does not expose configured location names, coordinates, access tokens, or other private configuration values.
 
+The diagnostics service is available only through Home Assistant Ingress. It requires the authenticated user header added by the Supervisor and is not published as a host port. The sidebar entry remains restricted to Home Assistant administrators.
+
 ## OpenWeatherMap
 
 Weather4Lox needs forecast-capable data from the Home Assistant OpenWeatherMap integration.
@@ -63,7 +65,7 @@ Default values:
 
 A successful refresh creates a complete new cache. Weather4Lox never merges old forecast rows into newly received data.
 
-If a refresh fails, a matching cached forecast may only be used while it is still within the configured cache validity and still covers the current date. An expired forecast is not served as a valid Loxone fallback.
+If a refresh fails, a matching cached forecast may only be used while it is still within the configured cache validity and its exact forecast end time is still in the future. An expired forecast is not served as a valid Loxone fallback.
 
 ## Forecast coverage
 

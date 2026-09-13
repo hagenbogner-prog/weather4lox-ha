@@ -71,6 +71,7 @@ jobs:
           assert config['ingress'] is True
           assert config['ingress_port'] == 8099
           assert config['panel_title'] == 'Weather4Lox'
+          assert config['panel_admin'] is True
           assert config['options']['weather_provider'] in ('dwd', 'openweathermap')
           assert config['options']['forecast_days'] == 7
           assert config['options']['dwd_refresh_interval_minutes'] == 120

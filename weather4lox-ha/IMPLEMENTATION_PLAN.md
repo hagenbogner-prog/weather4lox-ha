@@ -8,7 +8,7 @@
 4. Fetch real forecast data through Home Assistant and preserve its actual coverage/resolution.
 5. Never generate synthetic weather values during normal operation.
 6. Replace the cache atomically after a successful refresh.
-7. Preserve the last successful cache after a failure, but only serve it while it is still valid and its forecast still covers the current date.
+7. Preserve the last successful cache after a failure, but only serve it while it remains inside its TTL and its exact forecast end time is still in the future.
 8. Serialize cached normalized data as Loxone Gen 1 Weather Service Format 2 on TCP 6066.
 9. Keep optional MQTT Discovery independent from Loxone operation.
 

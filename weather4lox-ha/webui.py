@@ -9,6 +9,7 @@ from threading import Thread
 
 INGRESS_HOST = "0.0.0.0"
 INGRESS_PORT = 8099
+INGRESS_USER_HEADER = "X-Remote-User-Id"
 
 
 def _iso(value):
@@ -22,6 +23,11 @@ def _iso(value):
 def cache_is_usable(server, item, provider, entity):
     """Use the server's single cache-validity decision everywhere."""
     return bool(item and entity and server.cache_is_valid(item, provider, entity))
+
+
+def is_ingress_request(headers):
+    """Accept requests authenticated and forwarded by Home Assistant Ingress."""
+    return bool(str(headers.get(INGRESS_USER_HEADER, "")).strip())
 
 
 def _friendly_error(provider, entity, raw_error, cache_state):
@@ -265,7 +271,7 @@ const check = document.getElementById('check');
 const reload = document.getElementById('reload');
 async function perform(path) {{
   check.disabled = true; reload.disabled = true;
-  try {{ await fetch(path, {{cache:'no-store'}}); }} finally {{ location.reload(); }}
+  try {{ await fetch(path, {{method:'POST', cache:'no-store'}}); }} finally {{ location.reload(); }}
 }}
 check.addEventListener('click', () => perform('./api/check'));
 reload.addEventListener('click', () => location.reload());
@@ -294,9 +300,15 @@ def make_handler(server):
         def _json(self, data, status=200):
             self._reply(json.dumps(data, ensure_ascii=False, indent=2, default=str), status, "application/json; charset=utf-8")
 
+        def _is_authorized(self):
+            if is_ingress_request(self.headers):
+                return True
+            self._reply("Forbidden: Home Assistant Ingress required\n", 403, "text/plain; charset=utf-8")
+            return False
+
         def do_GET(self):
-            # Port 8099 is internal-only and is not published to the host.
-            # Home Assistant Supervisor authenticates and proxies the UI via Ingress.
+            if not self._is_authorized():
+                return
             path = self.path.split("?", 1)[0].rstrip("/") or "/"
             if path == "/":
                 self._reply(dashboard_html(server))
@@ -304,6 +316,15 @@ def make_handler(server):
             if path == "/api/status":
                 self._json(diagnostics(server))
                 return
+            if path == "/api/check":
+                self._reply("Method not allowed\n", 405, "text/plain; charset=utf-8")
+                return
+            self._reply("Not found\n", 404, "text/plain; charset=utf-8")
+
+        def do_POST(self):
+            if not self._is_authorized():
+                return
+            path = self.path.split("?", 1)[0].rstrip("/") or "/"
             if path == "/api/check":
                 self._json(run_check(server))
                 return

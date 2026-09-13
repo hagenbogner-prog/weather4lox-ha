@@ -1,4 +1,6 @@
 from pathlib import Path
+import re
+
 import yaml
 
 
@@ -21,8 +23,22 @@ def test_060_enables_ingress_without_reusing_loxone_port():
     assert config["version"] == "0.6.0"
     assert config["ingress"] is True
     assert config["ingress_port"] == 8099
+    assert config["panel_admin"] is True
     assert config["ports"]["6066/tcp"] == 6066
     assert config["panel_title"] == "Weather4Lox"
+
+
+def test_runtime_version_strings_match_app_version():
+    version = load_config()["version"]
+    runtime_files = ("server.py", "bootstrap.py", "run.sh")
+
+    for filename in runtime_files:
+        content = Path("weather4lox-ha", filename).read_text(encoding="utf-8")
+        assert version in content, f"{filename} does not contain app version {version}"
+
+    run_script = Path("weather4lox-ha/run.sh").read_text(encoding="utf-8")
+    logged_version = re.search(r"Weather4Lox HA ([0-9.]+) service", run_script)
+    assert logged_version and logged_version.group(1) == version
 
 
 def test_public_defaults_do_not_contain_installation_specific_location():
