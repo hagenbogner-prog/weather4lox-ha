@@ -39,7 +39,12 @@ class FakeServer:
         return bool(item and item.get("provider") == provider and item.get("entity") == entity)
 
     def cache_is_valid(self, item, provider, entity):
-        return self.cache_matches(item, provider, entity) and self.cache_age_minutes(item) <= 2880
+        if not self.cache_matches(item, provider, entity):
+            return False
+        if self.cache_age_minutes(item) > 2880:
+            return False
+        end = self.parse_dt(item.get("forecast_end"))
+        return bool(end and end.astimezone(timezone.utc) >= datetime.now(timezone.utc))
 
     def forecast_days(self, provider):
         return 7
@@ -67,11 +72,19 @@ def make_cache(end):
     }
 
 
-def test_cache_is_usable_only_while_forecast_covers_current_date():
+def test_cache_is_usable_only_while_forecast_end_is_in_future():
     current = make_cache(datetime.now(timezone.utc) + timedelta(hours=6))
-    expired = make_cache(datetime.now(timezone.utc) - timedelta(days=2))
+    expired = make_cache(datetime.now(timezone.utc) - timedelta(hours=1))
     assert webui.cache_is_usable(FakeServer(current), current, "openweathermap", "weather.openweathermap")
     assert not webui.cache_is_usable(FakeServer(expired), expired, "openweathermap", "weather.openweathermap")
+
+
+def test_same_day_forecast_that_already_ended_is_expired():
+    expired = make_cache(datetime.now(timezone.utc) - timedelta(minutes=5))
+    status = webui.diagnostics(FakeServer(expired))
+    assert status["cache"]["state"] == "expired"
+    assert status["level"] == "error"
+    assert status["issue"]["code"] == "forecast_expired"
 
 
 def test_openweathermap_forecast_failure_gets_actionable_hint():
