@@ -29,7 +29,9 @@ The dashboard reports:
 - Loxone request count since app startup
 - a human-readable explanation for detected configuration problems
 
-Use **Check now** to perform an immediate forecast refresh and validate the Loxone payload.
+Use **Check now** to perform an immediate forecast refresh and validate the Loxone payload. The dashboard keeps the result visible as a success, warning, or error message and updates the Format 2 status immediately.
+
+The **Direct service endpoints** section provides links to `/status` and `/control/refresh` on port `6066`. The dashboard derives the IP address or hostname from the current Home Assistant browser URL; it does not contain a hard-coded installation address. These links are intended for the local network. Remote Home Assistant URLs normally cannot reach the local Loxone port, and port `6066` should not be forwarded to the internet.
 
 The dashboard does not expose configured location names, coordinates, access tokens, or other private configuration values.
 

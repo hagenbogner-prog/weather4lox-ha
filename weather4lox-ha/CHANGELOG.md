@@ -11,6 +11,7 @@
 - Specific OpenWeatherMap guidance when the selected Home Assistant weather entity does not provide forecast data.
 - German and English configuration descriptions for the Home Assistant app UI.
 - App-level README, documentation, and changelog files for the Home Assistant Info and Documentation pages.
+- Neutral dashboard links to the status and manual refresh endpoints, derived from the current Home Assistant host.
 
 ### Changed
 
@@ -23,6 +24,7 @@
 
 ### Fixed
 
+- **Check now** now displays a visible success, warning, or error result instead of silently discarding the API response.
 - Improved diagnostics for the case where Home Assistant current weather data exists but the selected weather entity cannot provide `weather.get_forecasts` data.
 - Prevented expired forecast data from being presented as a usable Loxone fallback.
 - Prevented forecasts that ended earlier on the current day from being treated as current.

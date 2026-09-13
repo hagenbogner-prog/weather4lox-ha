@@ -125,6 +125,45 @@ def test_dashboard_does_not_render_location_configuration():
     assert "token" not in page.lower()
 
 
+def test_dashboard_builds_neutral_service_links_from_current_host():
+    cache = make_cache(datetime.now(timezone.utc) + timedelta(hours=6))
+    page = webui.dashboard_html(FakeServer(cache))
+
+    assert "window.location.hostname" in page
+    assert "${serviceBase}/status" in page
+    assert "${serviceBase}/control/refresh" in page
+    assert "192.168." not in page
+
+
+def test_run_check_returns_visible_success_result():
+    cache = make_cache(datetime.now(timezone.utc) + timedelta(hours=6))
+    server = FakeServer(cache)
+
+    state = webui.run_check(server)
+
+    assert state["check"]["ok"] is True
+    assert state["check"]["level"] == "ok"
+    assert "Loxone Format 2 ist gültig" in state["check"]["message"]
+    assert state["loxone"]["format_valid"] is True
+
+
+def test_run_check_returns_visible_error_result():
+    cache = make_cache(datetime.now(timezone.utc) + timedelta(hours=6))
+    server = FakeServer(cache)
+
+    def fail_refresh(force=False):
+        assert force is True
+        raise RuntimeError("Provider unavailable")
+
+    server.obtain_forecast = fail_refresh
+    state = webui.run_check(server)
+
+    assert state["check"]["ok"] is False
+    assert state["check"]["level"] == "error"
+    assert "Provider unavailable" in state["check"]["message"]
+    assert state["loxone"]["format_valid"] is False
+
+
 def request_webui(server, method="GET", path="/", headers=None):
     httpd = ThreadingHTTPServer(("127.0.0.1", 0), webui.make_handler(server))
     thread = Thread(target=httpd.serve_forever, daemon=True)

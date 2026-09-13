@@ -171,7 +171,32 @@ def run_check(server):
         server.last_validation = validation
     except Exception as exc:
         server.last_error = str(exc)
-    return diagnostics(server)
+        server.last_validation = {"ok": False, "error": str(exc)}
+    state = diagnostics(server)
+    validation_ok = state["loxone"]["format_valid"] is True
+    issue = state.get("issue")
+
+    if state["level"] == "ok" and validation_ok:
+        check_level = "ok"
+        message = "Prüfung erfolgreich: Forecast wurde aktualisiert und Loxone Format 2 ist gültig."
+    elif state["level"] == "warning" and validation_ok:
+        check_level = "warning"
+        message = "Prüfung abgeschlossen, aber Weather4Lox verwendet den Cache/Fallback."
+        if issue:
+            message += f" {issue['title']}: {issue['message']}"
+    elif issue:
+        check_level = "error"
+        message = f"Prüfung fehlgeschlagen: {issue['title']}. {issue['message']}"
+    else:
+        check_level = "error"
+        message = "Prüfung fehlgeschlagen: Loxone Format 2 konnte nicht bestätigt werden."
+
+    state["check"] = {
+        "ok": check_level == "ok",
+        "level": check_level,
+        "message": message,
+    }
+    return state
 
 
 def _fmt_minutes(value):
@@ -239,9 +264,13 @@ h1 {{ margin:0; font-size:28px; }} .sub {{ color:#aaa; margin-top:5px; }}
 .value {{ font-size:20px; font-weight:650; overflow-wrap:anywhere; }}
 .detail {{ color:#aaa; margin-top:8px; font-size:13px; line-height:1.45; }}
 .issue {{ border-radius:14px; padding:18px; margin:16px 0; }} .issue h2 {{ margin:0 0 8px; font-size:18px; }} .issue p {{ margin:0; line-height:1.5; }}
+.feedback {{ border-radius:14px; padding:14px 18px; margin:16px 0; line-height:1.5; }}
 .actions {{ display:flex; flex-wrap:wrap; gap:10px; margin:20px 0; }}
 button {{ border:0; border-radius:22px; padding:11px 18px; font-size:14px; font-weight:700; cursor:pointer; background:#03a9d9; color:#001a22; }}
 button.secondary {{ background:#3a3a3a; color:#eee; }} button:disabled {{ opacity:.55; cursor:wait; }}
+.endpoints {{ margin-top:16px; }} .endpoint-links {{ display:flex; flex-wrap:wrap; gap:10px; margin-top:12px; }}
+a.endpoint {{ display:inline-block; border:1px solid #555; border-radius:22px; padding:10px 16px; color:#ddd; text-decoration:none; font-weight:650; }}
+a.endpoint:hover {{ border-color:#03a9d9; color:#fff; }}
 footer {{ color:#888; font-size:12px; margin-top:24px; }}
 @media (max-width:640px) {{ header {{ align-items:flex-start; flex-direction:column; }} main {{ padding:16px; }} }}
 @media (prefers-color-scheme:light) {{ body {{ background:#f5f5f5; color:#111; }} .card {{ background:white; border-color:#ddd; }} .sub,.detail,.card h3,footer {{ color:#666; }} button.secondary {{ background:#ddd; color:#111; }} }}
@@ -254,6 +283,7 @@ footer {{ color:#888; font-size:12px; margin-top:24px; }}
   <div class="status {status_class}"><span class="mark">{icon}</span><span>{html.escape(state['status'])}</span></div>
 </header>
 {issue_html}
+<div id="feedback" class="feedback" role="status" aria-live="polite" hidden></div>
 <div class="actions">
   <button id="check">Jetzt prüfen</button>
   <button class="secondary" id="reload">Anzeige aktualisieren</button>
@@ -264,16 +294,56 @@ footer {{ color:#888; font-size:12px; margin-top:24px; }}
   <article class="card"><h3>Forecast</h3><div class="value">{state['forecast']['entries']} Einträge</div><div class="detail">Bis {html.escape(_fmt_time(state['forecast']['end']))}</div></article>
   <article class="card"><h3>Cache</h3><div class="value">{html.escape(cache_state_text)}</div><div class="detail">Alter: {_fmt_minutes(state['cache']['age_minutes'])} · Gültigkeit: {_fmt_minutes(state['cache']['validity_minutes'])}</div></article>
   <article class="card"><h3>Letzte erfolgreiche Aktualisierung</h3><div class="value">{html.escape(_fmt_time(state['refresh']['last_success']))}</div><div class="detail">Intervall: {state['refresh']['interval_minutes']} min</div></article>
-  <article class="card"><h3>Loxone Format 2</h3><div class="value">{html.escape(validation_text)}</div><div class="detail">Loxone-Anfragen seit Start: {state['loxone']['request_count']}</div></article>
+  <article class="card"><h3>Loxone Format 2</h3><div class="value" id="format-value">{html.escape(validation_text)}</div><div class="detail">Loxone-Anfragen seit Start: {state['loxone']['request_count']}</div></article>
+</section>
+<section class="card endpoints">
+  <h3>Direkte Service-Endpunkte</h3>
+  <div class="detail">Die Links verwenden automatisch die IP-Adresse oder den Hostnamen, über den Home Assistant gerade geöffnet ist.</div>
+  <div class="endpoint-links">
+    <a class="endpoint" id="status-link" target="_blank" rel="noopener noreferrer">Status öffnen</a>
+    <a class="endpoint" id="refresh-link" target="_blank" rel="noopener noreferrer">Forecast aktualisieren</a>
+  </div>
 </section>
 <footer>Die Statusseite zeigt keine Standortdaten, Koordinaten oder Zugangsdaten an.</footer>
 </main>
 <script>
 const check = document.getElementById('check');
 const reload = document.getElementById('reload');
+const feedback = document.getElementById('feedback');
+const formatValue = document.getElementById('format-value');
+
+const hostname = window.location.hostname.includes(':')
+  ? `[${{window.location.hostname}}]`
+  : window.location.hostname;
+const serviceBase = `http://${{hostname}}:6066`;
+document.getElementById('status-link').href = `${{serviceBase}}/status`;
+document.getElementById('refresh-link').href = `${{serviceBase}}/control/refresh`;
+
 async function perform(path) {{
   check.disabled = true; reload.disabled = true;
-  try {{ await fetch(path, {{method:'POST', cache:'no-store'}}); }} finally {{ location.reload(); }}
+  check.textContent = 'Prüfung läuft …';
+  feedback.hidden = true;
+  try {{
+    const response = await fetch(path, {{method:'POST', cache:'no-store'}});
+    const state = await response.json();
+    if (!response.ok) throw new Error(state.error || `HTTP ${{response.status}}`);
+
+    const result = state.check || {{level:'error', message:'Die Prüfung lieferte kein Ergebnis.'}};
+    const resultClass = result.level === 'ok' ? 'good' : (result.level === 'warning' ? 'warn' : 'bad');
+    feedback.className = `feedback ${{resultClass}}`;
+    feedback.textContent = result.message;
+    feedback.hidden = false;
+
+    const valid = state.loxone && state.loxone.format_valid;
+    formatValue.textContent = valid === true ? 'Gültig' : (valid === false ? 'Fehler' : 'Noch nicht geprüft');
+  }} catch (error) {{
+    feedback.className = 'feedback bad';
+    feedback.textContent = `Prüfung fehlgeschlagen: ${{error.message}}`;
+    feedback.hidden = false;
+  }} finally {{
+    check.disabled = false; reload.disabled = false;
+    check.textContent = 'Jetzt prüfen';
+  }}
 }}
 check.addEventListener('click', () => perform('./api/check'));
 reload.addEventListener('click', () => location.reload());
