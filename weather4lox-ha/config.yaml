@@ -1,7 +1,10 @@
 name: Weather4Lox HA
-version: "0.5.0"
+version: "0.6.2"
 slug: weather4lox-ha
-description: Loxone Gen 1 Weather Service emulator for Home Assistant
+description: >-
+  Provides Home Assistant weather forecasts to Loxone Miniserver Gen 1 in
+  Loxone Weather Service format, with cache, diagnostics, and an integrated
+  status web interface.
 url: https://github.com/hagenbogner-prog/weather4lox-ha
 arch:
   - amd64
@@ -10,6 +13,11 @@ startup: services
 boot: auto
 init: false
 homeassistant_api: true
+ingress: true
+ingress_port: 8099
+panel_icon: mdi:weather-partly-cloudy
+panel_title: Weather4Lox
+panel_admin: true
 ports:
   6066/tcp: 6066
 ports_description:
@@ -24,15 +32,12 @@ options:
   openweathermap_cache_validity_hours: 48
   forecast_days: 7
   fallback_to_cache: true
-  mqtt_entities: false
-  mqtt_discovery_prefix: homeassistant
-  location_city: Wertingen
-  country: Deutschland
-  country_code: DE
-  latitude: 48.56
-  longitude: 10.681
-  elevation_m: 450
-  timezone: Europe/Berlin
+  location_city: Home
+  country: ""
+  latitude: 0.0
+  longitude: 0.0
+  elevation_m: 0
+  timezone: UTC
   debug_logging: true
 schema:
   weather_provider: list(openweathermap|dwd)
@@ -44,11 +49,8 @@ schema:
   openweathermap_cache_validity_hours: int
   forecast_days: int
   fallback_to_cache: bool
-  mqtt_entities: bool
-  mqtt_discovery_prefix: str
   location_city: str
   country: str
-  country_code: str
   latitude: float
   longitude: float
   elevation_m: int

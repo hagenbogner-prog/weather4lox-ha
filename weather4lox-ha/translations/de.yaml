@@ -1,0 +1,51 @@
+configuration:
+  weather_provider:
+    name: Wetterprovider
+    description: Wähle die Home-Assistant-Wetterintegration, deren Vorhersage Weather4Lox für Loxone verwenden soll.
+  dwd_weather_entity:
+    name: DWD Wetterentität
+    description: Home-Assistant-weather.*-Entität für DWD. Mit "auto" versucht Weather4Lox eine passende Entität automatisch zu erkennen.
+  dwd_refresh_interval_minutes:
+    name: DWD Aktualisierungsintervall
+    description: Zeit in Minuten zwischen automatischen DWD-Forecast-Aktualisierungen.
+  dwd_cache_validity_hours:
+    name: DWD Cache-Gültigkeit
+    description: Maximale Gültigkeit des zuletzt erfolgreichen DWD-Forecasts in Stunden.
+  openweathermap_weather_entity:
+    name: OpenWeatherMap Wetterentität
+    description: Home-Assistant-weather.*-Entität für OpenWeatherMap. Mit "auto" versucht Weather4Lox eine passende Entität automatisch zu erkennen.
+  openweathermap_refresh_interval_minutes:
+    name: OpenWeatherMap Aktualisierungsintervall
+    description: Zeit in Minuten zwischen automatischen OpenWeatherMap-Forecast-Aktualisierungen.
+  openweathermap_cache_validity_hours:
+    name: OpenWeatherMap Cache-Gültigkeit
+    description: Maximale Gültigkeit des zuletzt erfolgreichen OpenWeatherMap-Forecasts in Stunden.
+  forecast_days:
+    name: Forecast-Tage
+    description: Gewünschter Vorhersagehorizont von 1 bis 7 Tagen. Die tatsächlich verfügbaren Daten hängen vom Provider ab.
+  fallback_to_cache:
+    name: Cache-Fallback verwenden
+    description: Bei einem vorübergehenden Providerfehler den letzten noch gültigen Forecast verwenden. Abgelaufene Vorhersagen werden nicht als gültiger Fallback ausgegeben.
+  location_city:
+    name: Stationsname
+    description: Optionaler Name für die Loxone-Stationsmetadaten. Dieser Wert wird nicht auf der Weather4Lox-Diagnoseseite angezeigt.
+  country:
+    name: Land
+    description: Optionales Land für die Loxone-Stationsmetadaten.
+  latitude:
+    name: Breitengrad
+    description: Fallback-Breitengrad, falls die Loxone-Anfrage keine Koordinaten enthält. Wird nicht auf der Diagnoseseite angezeigt.
+  longitude:
+    name: Längengrad
+    description: Fallback-Längengrad, falls die Loxone-Anfrage keine Koordinaten enthält. Wird nicht auf der Diagnoseseite angezeigt.
+  elevation_m:
+    name: Höhe über NN
+    description: Fallback-Höhe in Metern, falls die Loxone-Anfrage keine Höhe enthält.
+  timezone:
+    name: Zeitzone
+    description: Zeitzone für die lokale Datums- und Zeitdarstellung in der Loxone-Antwort.
+  debug_logging:
+    name: Debug-Protokollierung
+    description: Zusätzliche technische Protokolle für die Fehlersuche aktivieren.
+network:
+  6066/tcp: Lokaler Loxone Weather Service HTTP-Port

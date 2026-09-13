@@ -22,7 +22,7 @@ from providers import PROFILES, cache_ttl_minutes, forecast_days, refresh_minute
 
 HOST = "0.0.0.0"
 PORT = 6066
-VERSION = "0.5.0"
+VERSION = "0.6.2"
 HA_API = "http://supervisor/core/api"
 TOKEN = os.environ.get("SUPERVISOR_TOKEN", "")
 CACHE_FILE = "/data/forecast_cache.json"
@@ -53,6 +53,23 @@ def opts():
 def debug(message, *args):
     if opts().get("debug_logging", True):
         log.debug(message, *args)
+
+
+def is_loxone_forecast_path(path):
+    """Identify real Loxone forecast requests, excluding diagnostics."""
+    return path.rstrip("/") == "/forecast"
+
+
+def record_loxone_request(path, query):
+    """Count a Loxone request without retaining private query values."""
+    global request_count, last_request
+    with lock:
+        request_count += 1
+        last_request = {
+            "path": path,
+            "parameters": sorted(query),
+            "time": datetime.now(timezone.utc).isoformat(),
+        }
 
 
 def parse_dt(value):
@@ -207,6 +224,13 @@ def snapshot(entity=None):
     }
 
 
+def diagnostic_snapshot(entity=None):
+    """Return normalized weather diagnostics without raw HA attributes."""
+    data = snapshot(entity)
+    data.pop("raw_attributes", None)
+    return data
+
+
 def service_forecast(entity, kind):
     response = ha_service("weather", "get_forecasts", {"entity_id": entity, "type": kind})
     service_response = response.get("service_response") or response.get("response") or {}
@@ -247,9 +271,35 @@ def cache_matches(item, provider, entity):
     return bool(item and item.get("provider") == provider and item.get("entity") == entity)
 
 
+def cache_has_current_forecast(item, now=None):
+    """Return whether the cached forecast ends strictly after ``now``."""
+    if not item:
+        return False
+    end = parse_dt(item.get("forecast_end"))
+    if end is None:
+        dates = [
+            parse_dt(row.get("datetime"))
+            for row in item.get("forecast", [])
+            if isinstance(row, dict)
+        ]
+        dates = [dt for dt in dates if dt]
+        end = max(dates) if dates else None
+    if end is None:
+        return False
+    current = now or datetime.now(timezone.utc)
+    if current.tzinfo is None:
+        current = current.replace(tzinfo=timezone.utc)
+    return end.astimezone(timezone.utc) > current.astimezone(timezone.utc)
+
+
 def cache_is_valid(item, provider, entity):
     age = cache_age_minutes(item)
-    return cache_matches(item, provider, entity) and age is not None and age <= cache_ttl_minutes(provider)
+    return (
+        cache_matches(item, provider, entity)
+        and age is not None
+        and age <= cache_ttl_minutes(provider)
+        and cache_has_current_forecast(item)
+    )
 
 
 def write_cache(provider, entity, forecast, source="live"):
@@ -267,6 +317,7 @@ def write_cache(provider, entity, forecast, source="live"):
         "forecast_end": max(dates).isoformat() if dates else None,
         "requested_days": forecast_days(provider),
         "actual_hours": len(forecast),
+        "actual_entries": len(forecast),
         "cache_validity_minutes": cache_ttl_minutes(provider),
         "source": source,
         "status": "live",
@@ -283,12 +334,17 @@ def write_cache(provider, entity, forecast, source="live"):
 
 
 def fetch_live_forecast(provider, entity):
-    """Fetch provider-specific forecast from HA and return only real provider data."""
-    hourly = service_forecast(entity, "hourly")
-    if hourly:
-        return hourly
-    daily = service_forecast(entity, "daily")
-    return daily
+    """Fetch provider forecast from HA without inventing missing data."""
+    errors = []
+    for kind in ("hourly", "daily"):
+        try:
+            result = service_forecast(entity, kind)
+            if result:
+                return result
+        except Exception as exc:
+            errors.append(f"{kind}: {exc}")
+    detail = "; ".join(errors) if errors else "Home Assistant returned no forecast entries"
+    raise RuntimeError(f"No usable forecast available for {entity} ({provider}): {detail}")
 
 
 def obtain_forecast(force=False):
@@ -306,9 +362,6 @@ def obtain_forecast(force=False):
     last_attempt = datetime.now(timezone.utc)
     try:
         live = fetch_live_forecast(provider, entity)
-        if not live:
-            raise RuntimeError("Home Assistant returned no forecast entries")
-        # Successful refresh is a complete rebuild; never merge old and new data.
         payload = write_cache(provider, entity, live, "live")
         last_error = None
         log.info(
@@ -319,7 +372,7 @@ def obtain_forecast(force=False):
     except Exception as exc:
         last_error = str(exc)
         log.warning("Forecast refresh failed: %s", exc)
-        if options.get("fallback_to_cache", True) and cached and cache_matches(cached, provider, entity):
+        if options.get("fallback_to_cache", True) and cached and cache_is_valid(cached, provider, entity):
             fallback = dict(cached)
             fallback["status"] = "cache"
             fallback["last_attempt"] = last_attempt.isoformat()
@@ -344,7 +397,7 @@ def coord(value):
         return float(lon), float(lat)
     except (TypeError, ValueError):
         o = opts()
-        return safe_float(o.get("longitude"), 10.681), safe_float(o.get("latitude"), 48.56)
+        return safe_float(o.get("longitude"), 0.0), safe_float(o.get("latitude"), 0.0)
 
 
 def metadata():
@@ -353,20 +406,20 @@ def metadata():
 
 def station_metadata(query):
     o = opts()
-    fallback = f"{o.get('longitude', 10.681)},{o.get('latitude', 48.56)}"
+    fallback = f"{o.get('longitude', 0.0)},{o.get('latitude', 0.0)}"
     lon, lat = coord(query.get("coord", [fallback])[0])
-    asl = query.get("asl", [str(o.get("elevation_m", 450))])[0]
+    asl = query.get("asl", [str(o.get("elevation_m", 0))])[0]
     now = datetime.now().astimezone()
     offset = now.strftime("%z")
     utc_diff = f"UTC{offset[:3]}.{offset[3:]}" if len(offset) == 5 else "UTC+00.00"
     return ";".join([
         "",
-        str(o.get("location_city", "Wertingen")),
+        str(o.get("location_city", "Home")),
         fmt(lon, 6),
         fmt(lat, 6),
         str(asl),
-        str(o.get("country", "Deutschland")),
-        now.tzname() or o.get("timezone", "Europe/Berlin"),
+        str(o.get("country", "")),
+        now.tzname() or o.get("timezone", "UTC"),
         utc_diff,
         "",
         "",
@@ -481,8 +534,14 @@ def validate_real_payload(query):
 class Handler(BaseHTTPRequestHandler):
     server_version = f"Weather4LoxHA/{VERSION}"
 
-    def log_message(self, fmt_text, *args):
-        debug("HTTP %s - " + fmt_text, self.address_string(), *args)
+    def log_message(self, _fmt_text, *_args):
+        # Query values can contain location or user data; log only the path.
+        debug(
+            "HTTP %s - %s %s",
+            self.address_string(),
+            self.command,
+            urlparse(self.path).path,
+        )
 
     def reply(self, body, status=200, content_type="text/plain; charset=utf-8"):
         data = body.encode("utf-8")
@@ -497,11 +556,10 @@ class Handler(BaseHTTPRequestHandler):
         self.reply(json.dumps(obj, ensure_ascii=False, indent=2, default=str), status, "application/json; charset=utf-8")
 
     def do_GET(self):
-        global request_count, last_request, last_validation
-        request_count += 1
+        global last_validation
         parsed = urlparse(self.path)
         query = parse_qs(parsed.query)
-        last_request = {"path": parsed.path, "query": query, "time": datetime.now(timezone.utc).isoformat()}
+        normalized_path = parsed.path.rstrip("/") or "/"
         try:
             if parsed.path == "/health":
                 self.reply(f"Weather4Lox HA OK (v{VERSION})\n")
@@ -514,7 +572,11 @@ class Handler(BaseHTTPRequestHandler):
                 except Exception:
                     pass
                 age = cache_age_minutes(c)
-                status = "🟢 Live" if c and cache_matches(c, provider, entity) and age is not None and age <= cache_ttl_minutes(provider) else ("🟡 Cache/Fallback" if c else "🔴 Error")
+                valid = bool(entity and cache_is_valid(c, provider, entity))
+                status = "🟡 Cache/Fallback" if valid and last_error else ("🟢 Live" if valid else "🔴 Error")
+                with lock:
+                    loxone_request_count = request_count
+                    latest_loxone_request = dict(last_request) if last_request else None
                 self.json({
                     "version": VERSION,
                     "provider": provider,
@@ -525,20 +587,22 @@ class Handler(BaseHTTPRequestHandler):
                     "cache_entries": len(c.get("forecast", [])) if c else 0,
                     "forecast_days_requested": forecast_days(provider),
                     "refresh_interval_minutes": refresh_minutes(provider),
-                    "last_attempt": last_attempt,
-                    "last_success": last_success,
+                    "last_attempt": last_attempt or (c or {}).get("last_attempt"),
+                    "last_success": last_success or (c or {}).get("last_success"),
                     "last_error": last_error,
-                    "request_count": request_count,
-                    "last_request": last_request,
+                    "request_count": loxone_request_count,
+                    "last_request": latest_loxone_request,
                     "last_validation": last_validation,
                 })
             elif parsed.path == "/raw":
-                self.json(snapshot())
+                self.json(diagnostic_snapshot())
             elif parsed.path == "/debug/forecast":
                 force = query.get("refresh", ["0"])[0] == "1"
                 forecast, source, meta = obtain_forecast(force=force)
                 self.json({"version": VERSION, "source": source, "metadata": meta, "forecast": forecast})
-            elif parsed.path.rstrip("/") in ("/forecast", "/debug/loxone"):
+            elif normalized_path in ("/forecast", "/debug/loxone"):
+                if is_loxone_forecast_path(normalized_path):
+                    record_loxone_request(normalized_path, query)
                 forecast, _, _ = obtain_forecast()
                 payload, validation = make_payload(forecast, query)
                 last_validation = validation
@@ -560,6 +624,7 @@ class Handler(BaseHTTPRequestHandler):
 
 def main():
     o = opts()
+    log.setLevel(logging.DEBUG if o.get("debug_logging", False) else logging.INFO)
     log.info("Weather4Lox HA %s starting on %s:%d", VERSION, HOST, PORT)
     log.info("Config: provider=%s refresh=%sm cache=%sm forecast_days=%s", o.get("weather_provider"), refresh_minutes(o.get("weather_provider", "openweathermap")), cache_ttl_minutes(o.get("weather_provider", "openweathermap")), forecast_days(o.get("weather_provider", "openweathermap")))
     ThreadingHTTPServer((HOST, PORT), Handler).serve_forever()

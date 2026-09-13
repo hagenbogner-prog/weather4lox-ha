@@ -18,7 +18,7 @@ def _fmt(core, value, digits=2, default="0"):
     return core.fmt(value, digits, default)
 
 
-def _coord(value, default_lon=10.681, default_lat=48.56):
+def _coord(value, default_lon=0.0, default_lat=0.0):
     try:
         lon, lat = str(value).split(",", 1)
         return float(lon), float(lat)
@@ -46,24 +46,24 @@ def _timezone_info(core):
         if len(raw_offset) == 5
         else "UTC+00.00"
     )
-    return now.tzname() or core.opts().get("timezone", "Europe/Berlin"), utc_offset
+    return now.tzname() or core.opts().get("timezone", "UTC"), utc_offset
 
 
 def station_metadata(core, query):
     options = core.opts()
     fallback_coord = (
-        f"{options.get('longitude', 10.681)},{options.get('latitude', 48.56)}"
+        f"{options.get('longitude', 0.0)},{options.get('latitude', 0.0)}"
     )
     lon, lat = _coord(query.get("coord", [fallback_coord])[0])
-    asl = query.get("asl", [str(options.get("elevation_m", 450))])[0]
+    asl = query.get("asl", [str(options.get("elevation_m", 0))])[0]
     timezone_name, utc_offset = _timezone_info(core)
     return ";".join([
         "",
-        str(options.get("location_city", "Wertingen")),
+        str(options.get("location_city", "Home")),
         _fmt(core, lon, 6),
         _fmt(core, lat, 6),
         str(asl),
-        str(options.get("country", "Deutschland")),
+        str(options.get("country", "")),
         timezone_name,
         utc_offset,
         "",
