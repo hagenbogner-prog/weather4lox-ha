@@ -27,7 +27,8 @@
 
 ## Release process
 
-- Develop 0.6.0 on a feature branch.
-- Run Python compilation, unit tests, configuration checks, privacy checks and app-image builds in CI.
+- Develop each release on a feature branch.
+- Run Python compilation, focused linting, unit tests, configuration checks, privacy checks and app-image builds in CI.
+- Verify Home Assistant Ingress, manual diagnostics and one real Loxone `/forecast` request before publishing.
 - Review the pull request before changing `main`.
-- Merge only after the release candidate passes CI and has been reviewed.
+- Merge only after the release candidate passes CI, has been reviewed and contains no installation-specific data.
