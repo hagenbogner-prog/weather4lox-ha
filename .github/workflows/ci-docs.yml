@@ -172,8 +172,8 @@ jobs:
           readme = Path('README.md')
           text = readme.read_text(encoding='utf-8')
           block = ('<!-- AUTO-GENERATED: ci-docs.yml -->\n'
-                   f'Current version: **{version}**  \n'
-                   f'Forecast horizon: **{options["forecast_days"]} days**  \n'
+                   f'Current version: **{version}**\n'
+                   f'Forecast horizon: **1–{options["forecast_days"]} days**  \n'
                    f'Provider refresh: **DWD {options["dwd_refresh_interval_minutes"]} min / OpenWeatherMap {options["openweathermap_refresh_interval_minutes"]} min**  \n'
                    '<!-- END AUTO-GENERATED -->')
           pattern = r'<!-- AUTO-GENERATED: ci-docs\.yml -->.*?<!-- END AUTO-GENERATED -->'
