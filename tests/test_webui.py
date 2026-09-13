@@ -11,7 +11,7 @@ import webui
 
 
 class FakeServer:
-    VERSION = "0.6.0"
+    VERSION = "0.6.1"
     last_error = None
     last_attempt = None
     last_success = None

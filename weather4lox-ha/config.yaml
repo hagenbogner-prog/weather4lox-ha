@@ -1,5 +1,5 @@
 name: Weather4Lox HA
-version: "0.6.0"
+version: "0.6.1"
 slug: weather4lox-ha
 description: >-
   Provides Home Assistant weather forecasts to Loxone Miniserver Gen 1 in

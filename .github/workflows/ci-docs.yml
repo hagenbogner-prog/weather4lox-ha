@@ -64,7 +64,7 @@ jobs:
 
           config = yaml.safe_load(Path('weather4lox-ha/config.yaml').read_text(encoding='utf-8'))
           assert config['name'] == 'Weather4Lox HA'
-          assert config['version'] == '0.6.0'
+          assert config['version'] == '0.6.1'
           assert config['slug'] == 'weather4lox-ha'
           assert config['arch'] == ['amd64', 'aarch64']
           assert config['ports']['6066/tcp'] == 6066
@@ -86,6 +86,13 @@ jobs:
 
           with Image.open('weather4lox-ha/icon.png') as icon:
               assert icon.size == (128, 128), f'icon.png must be 128x128, got {icon.size}'
+              assert icon.mode == 'RGBA', f'icon.png must provide transparency, got {icon.mode}'
+              assert icon.getpixel((0, 0))[3] == 0, 'icon.png corners must be transparent'
+
+          with Image.open('weather4lox-ha/logo.png') as logo:
+              assert logo.size == (256, 256), f'logo.png must be 256x256, got {logo.size}'
+              assert logo.mode == 'RGBA', f'logo.png must provide transparency, got {logo.mode}'
+              assert logo.getpixel((0, 0))[3] == 0, 'logo.png corners must be transparent'
 
           print(f"Validated Weather4Lox HA {config['version']}")
           PY

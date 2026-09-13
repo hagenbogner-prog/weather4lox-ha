@@ -20,7 +20,7 @@ def test_app_configuration_uses_exactly_one_supported_provider_choice():
 
 def test_060_enables_ingress_without_reusing_loxone_port():
     config = load_config()
-    assert config["version"] == "0.6.0"
+    assert config["version"] == "0.6.1"
     assert config["ingress"] is True
     assert config["ingress_port"] == 8099
     assert config["panel_admin"] is True

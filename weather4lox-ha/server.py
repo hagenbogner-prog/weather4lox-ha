@@ -22,7 +22,7 @@ from providers import PROFILES, cache_ttl_minutes, forecast_days, refresh_minute
 
 HOST = "0.0.0.0"
 PORT = 6066
-VERSION = "0.6.0"
+VERSION = "0.6.1"
 HA_API = "http://supervisor/core/api"
 TOKEN = os.environ.get("SUPERVISOR_TOKEN", "")
 CACHE_FILE = "/data/forecast_cache.json"

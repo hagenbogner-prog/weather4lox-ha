@@ -11,7 +11,7 @@ import loxone_format2
 import server
 import webui
 
-VERSION = "0.6.0"
+VERSION = "0.6.1"
 server.VERSION = VERSION
 server.Handler.server_version = f"Weather4LoxHA/{VERSION}"
 
