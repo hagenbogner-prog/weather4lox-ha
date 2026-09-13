@@ -121,8 +121,9 @@ GET /raw
 GET /debug/forecast
 GET /debug/loxone/validate
 GET /control/refresh
-GET /control/clear-cache
 ```
+
+The `/status` endpoint reports only real `/forecast` calls as Loxone requests and never stores query values such as user names or coordinates. `/raw` exposes only normalized weather values and omits raw Home Assistant attributes.
 
 ## Documentation
 
@@ -138,10 +139,10 @@ Public documentation and example configuration intentionally use neutral placeho
 
 ## License
 
-MIT
+[MIT](LICENSE)
 
 <!-- AUTO-GENERATED: ci-docs.yml -->
-Current version: **0.6.1**
+Current version: **0.6.2**
 Forecast horizon: **1–7 days**  
 Provider refresh: **DWD 120 min / OpenWeatherMap 60 min**  
 <!-- END AUTO-GENERATED -->

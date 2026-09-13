@@ -1,5 +1,5 @@
 name: Weather4Lox HA
-version: "0.6.1"
+version: "0.6.2"
 slug: weather4lox-ha
 description: >-
   Provides Home Assistant weather forecasts to Loxone Miniserver Gen 1 in
@@ -32,11 +32,8 @@ options:
   openweathermap_cache_validity_hours: 48
   forecast_days: 7
   fallback_to_cache: true
-  mqtt_entities: false
-  mqtt_discovery_prefix: homeassistant
   location_city: Home
   country: ""
-  country_code: ""
   latitude: 0.0
   longitude: 0.0
   elevation_m: 0
@@ -52,11 +49,8 @@ schema:
   openweathermap_cache_validity_hours: int
   forecast_days: int
   fallback_to_cache: bool
-  mqtt_entities: bool
-  mqtt_discovery_prefix: str
   location_city: str
   country: str
-  country_code: str
   latitude: float
   longitude: float
   elevation_m: int

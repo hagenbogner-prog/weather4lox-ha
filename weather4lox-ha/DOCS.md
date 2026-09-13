@@ -26,7 +26,7 @@ The dashboard reports:
 - cache age and configured validity
 - last refresh attempt and last successful refresh
 - Loxone Format 2 validation result
-- Loxone request count since app startup
+- real Loxone `/forecast` request count since app startup
 - a human-readable explanation for detected configuration problems
 
 Use **Check now** to perform an immediate forecast refresh and validate the Loxone payload. The dashboard keeps the result visible as a success, warning, or error message and updates the Format 2 status immediately.
@@ -150,6 +150,8 @@ Check the dashboard in this order:
 
 If the request counter does not increase while the Miniserver requests weather data, verify DNS redirection and TCP port `6066` reachability.
 
+Opening `/health`, `/status` or another diagnostic endpoint does not increase the Loxone request counter. Stored request diagnostics contain only the endpoint, time, and parameter names; parameter values such as users or coordinates are not retained.
+
 ## Diagnostic HTTP endpoints
 
 The Loxone service continues to expose the existing diagnostic endpoints on port `6066`:
@@ -161,7 +163,8 @@ The Loxone service continues to expose the existing diagnostic endpoints on port
 /debug/forecast
 /debug/loxone/validate
 /control/refresh
-/control/clear-cache
 ```
+
+`/raw` returns normalized weather values only and does not expose the raw Home Assistant attribute dictionary.
 
 The Ingress dashboard is served separately on the internal Ingress port and is intended to be accessed through Home Assistant.

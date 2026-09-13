@@ -26,21 +26,12 @@ configuration:
   fallback_to_cache:
     name: Cache-Fallback verwenden
     description: Bei einem vorübergehenden Providerfehler den letzten noch gültigen Forecast verwenden. Abgelaufene Vorhersagen werden nicht als gültiger Fallback ausgegeben.
-  mqtt_entities:
-    name: MQTT-Entitäten veröffentlichen
-    description: Optionale Weather4Lox-Sensoren über MQTT Discovery veröffentlichen. Für den Loxone-Betrieb nicht erforderlich.
-  mqtt_discovery_prefix:
-    name: MQTT Discovery Prefix
-    description: MQTT Discovery Prefix, normalerweise "homeassistant".
   location_city:
     name: Stationsname
     description: Optionaler Name für die Loxone-Stationsmetadaten. Dieser Wert wird nicht auf der Weather4Lox-Diagnoseseite angezeigt.
   country:
     name: Land
     description: Optionales Land für die Loxone-Stationsmetadaten.
-  country_code:
-    name: Ländercode
-    description: Optionaler zweistelliger Ländercode für Metadaten.
   latitude:
     name: Breitengrad
     description: Fallback-Breitengrad, falls die Loxone-Anfrage keine Koordinaten enthält. Wird nicht auf der Diagnoseseite angezeigt.

@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.6.2
+
+### Changed
+
+- The Loxone request counter now counts only real `/forecast` calls; health, status, and debug requests no longer affect it.
+- Request diagnostics retain only parameter names and never store query values such as users or coordinates.
+- `/raw` now returns normalized weather values without the complete raw Home Assistant attribute dictionary.
+- Removed inactive MQTT Discovery and country-code configuration fields that were not connected to runtime behavior.
+- Removed the unauthenticated cache-deletion endpoint while retaining the non-destructive manual refresh endpoint.
+- Debug HTTP logging now works as configured and omits query strings.
+- Pull-request CI now uses read-only repository permissions; write access is isolated to the post-merge documentation job on `main`.
+
+### Added
+
+- MIT license file and repository ignore rules for local Python artifacts and environment files.
+- Automated checks for release assets and the absence of inactive configuration fields.
+
 ## 0.6.1
 
 ### Added

@@ -18,9 +18,9 @@ def test_app_configuration_uses_exactly_one_supported_provider_choice():
     assert options["openweathermap_refresh_interval_minutes"] == 60
 
 
-def test_060_enables_ingress_without_reusing_loxone_port():
+def test_current_release_enables_ingress_without_reusing_loxone_port():
     config = load_config()
-    assert config["version"] == "0.6.1"
+    assert config["version"] == "0.6.2"
     assert config["ingress"] is True
     assert config["ingress_port"] == 8099
     assert config["panel_admin"] is True
@@ -41,6 +41,13 @@ def test_runtime_version_strings_match_app_version():
     assert logged_version and logged_version.group(1) == version
 
 
+def test_readme_version_matches_app_version():
+    version = load_config()["version"]
+    readme = Path("README.md").read_text(encoding="utf-8")
+
+    assert f"Current version: **{version}**" in readme
+
+
 def test_public_defaults_do_not_contain_installation_specific_location():
     config = load_config()
     options = config["options"]
@@ -49,3 +56,12 @@ def test_public_defaults_do_not_contain_installation_specific_location():
     assert options["longitude"] == 0.0
     assert options["elevation_m"] == 0
     assert options["timezone"] == "UTC"
+
+
+def test_configuration_does_not_offer_unimplemented_options():
+    config = load_config()
+    configured_keys = set(config["options"]) | set(config["schema"])
+
+    assert "mqtt_entities" not in configured_keys
+    assert "mqtt_discovery_prefix" not in configured_keys
+    assert "country_code" not in configured_keys

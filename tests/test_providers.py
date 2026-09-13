@@ -3,7 +3,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parents[1] / "weather4lox-ha"))
 
-from providers import cache_ttl_minutes, forecast_days, get_profile, refresh_minutes
+from providers import cache_ttl_minutes, forecast_days, refresh_minutes
 
 
 def test_only_supported_providers_exist():

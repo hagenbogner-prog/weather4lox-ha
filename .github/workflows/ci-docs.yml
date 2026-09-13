@@ -7,7 +7,7 @@ on:
     branches: [main, master]
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build-and-verify:
@@ -26,7 +26,7 @@ jobs:
       - name: Install test dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install pyyaml pytest pillow
+          python -m pip install pyyaml pytest pillow ruff
 
       - name: Verify Home Assistant app tree
         run: |
@@ -39,7 +39,7 @@ jobs:
           test -f weather4lox-ha/loxone_format2.py
           test -f weather4lox-ha/protocol/loxone_gen1.py
           test -f weather4lox-ha/providers.py
-          test -f weather4lox-ha/ha_entities.py
+          test -f LICENSE
           test -f weather4lox-ha/icon.png
           test -f weather4lox-ha/logo.png
           test -f weather4lox-ha/README.md
@@ -53,6 +53,7 @@ jobs:
           test ! -e weather4lox-ha/live_data.py
           test ! -e weather4lox-ha/json_compat.py
           test ! -e weather4lox-ha/loxone_pictos.json
+          test ! -e weather4lox-ha/ha_entities.py
 
       - name: Validate configuration, icon and Python sources
         run: |
@@ -64,7 +65,7 @@ jobs:
 
           config = yaml.safe_load(Path('weather4lox-ha/config.yaml').read_text(encoding='utf-8'))
           assert config['name'] == 'Weather4Lox HA'
-          assert config['version'] == '0.6.1'
+          assert config['version'] == '0.6.2'
           assert config['slug'] == 'weather4lox-ha'
           assert config['arch'] == ['amd64', 'aarch64']
           assert config['ports']['6066/tcp'] == 6066
@@ -137,7 +138,27 @@ jobs:
           docker build --build-arg BUILD_VERSION="$VERSION" --build-arg BUILD_ARCH=amd64 -t weather4lox-ha:test weather4lox-ha
 
       - name: Run tests
-        run: python -m pytest -q
+        run: |
+          python -m ruff check --select=E4,E7,E9,F weather4lox-ha tests
+          python -m pytest -q
+
+  update-documentation:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: build-and-verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install documentation dependency
+        run: python -m pip install pyyaml
 
       - name: Generate Documentation
         run: |
@@ -161,7 +182,6 @@ jobs:
           PY
 
       - name: Commit & Push updated documentation
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: 'docs: automatische Aktualisierung der Dokumentation [skip ci]'

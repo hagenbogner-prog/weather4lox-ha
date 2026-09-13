@@ -10,7 +10,6 @@
 6. Replace the cache atomically after a successful refresh.
 7. Preserve the last successful cache after a failure, but only serve it while it remains inside its TTL and its exact forecast end time is still in the future.
 8. Serialize cached normalized data as Loxone Gen 1 Weather Service Format 2 on TCP 6066.
-9. Keep optional MQTT Discovery independent from Loxone operation.
 
 ## Version 0.6.0
 

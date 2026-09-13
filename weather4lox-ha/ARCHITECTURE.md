@@ -36,7 +36,6 @@ The Loxone service remains independent from the diagnostics UI. Loxone continues
 - Expired forecast data is retained for diagnosis but is not presented as a valid Loxone fallback.
 - Cache metadata records provider, entity, timestamps, requested horizon, actual coverage, entry count and status.
 - No synthetic weather forecast is generated in normal operation.
-- Manual cache clearing removes the fallback cache deliberately.
 
 ## Entity discovery
 
@@ -51,7 +50,3 @@ Weather4Lox requests forecasts through Home Assistant's `weather.get_forecasts` 
 The diagnostics interface is a presentation layer over the existing Weather4Lox runtime state. It does not maintain a second forecast cache and does not fetch weather from providers independently.
 
 The interface shows provider, entity, forecast coverage, cache health, refresh timestamps, Loxone Format 2 validation and request counts. It intentionally excludes location names, coordinates, access tokens and other installation-specific private values.
-
-## Home Assistant entities
-
-The app can optionally publish normalized values through MQTT Discovery. This is an optional presentation layer; Loxone service operation does not depend on MQTT or on the Ingress dashboard.

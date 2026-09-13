@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Bootstrap the Weather4Lox HA app, cache refresher, and ingress diagnostics UI."""
 
-import os
 from datetime import datetime
 from threading import Event, Thread
 from urllib.parse import urlparse
@@ -11,7 +10,7 @@ import loxone_format2
 import server
 import webui
 
-VERSION = "0.6.1"
+VERSION = "0.6.2"
 server.VERSION = VERSION
 server.Handler.server_version = f"Weather4LoxHA/{VERSION}"
 
@@ -46,16 +45,6 @@ _original_do_get = server.Handler.do_GET
 
 def control_do_get(self):
     path = urlparse(self.path).path.rstrip("/")
-    if path == "/control/clear-cache":
-        try:
-            with server.lock:
-                server.cache = None
-                if os.path.exists(server.CACHE_FILE):
-                    os.remove(server.CACHE_FILE)
-            self.json({"ok": True, "status": "🔴 Error", "message": "Cache cleared"})
-        except Exception as exc:
-            self.json({"ok": False, "error": str(exc)}, 500)
-        return
     if path == "/control/refresh":
         try:
             forecast, source, meta = server.obtain_forecast(force=True)
