@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import html
 import json
-from datetime import datetime, timezone
+from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from threading import Thread
 
@@ -19,27 +19,9 @@ def _iso(value):
     return str(value)
 
 
-def _cache_has_current_forecast(server, item):
-    if not item:
-        return False
-    end = server.parse_dt(item.get("forecast_end"))
-    if end is None:
-        forecast = item.get("forecast") or []
-        dates = [server.parse_dt(row.get("datetime")) for row in forecast if isinstance(row, dict)]
-        dates = [dt for dt in dates if dt]
-        end = max(dates) if dates else None
-    if end is None:
-        return False
-    return end.astimezone().date() >= datetime.now().astimezone().date()
-
-
 def cache_is_usable(server, item, provider, entity):
-    return bool(
-        item
-        and entity
-        and server.cache_is_valid(item, provider, entity)
-        and _cache_has_current_forecast(server, item)
-    )
+    """Use the server's single cache-validity decision everywhere."""
+    return bool(item and entity and server.cache_is_valid(item, provider, entity))
 
 
 def _friendly_error(provider, entity, raw_error, cache_state):
@@ -313,8 +295,8 @@ def make_handler(server):
             self._reply(json.dumps(data, ensure_ascii=False, indent=2, default=str), status, "application/json; charset=utf-8")
 
         def do_GET(self):
-            # Port 8099 is not published to the host; Home Assistant Supervisor
-            # provides authentication and proxies this service through Ingress.
+            # Port 8099 is internal-only and is not published to the host.
+            # Home Assistant Supervisor authenticates and proxies the UI via Ingress.
             path = self.path.split("?", 1)[0].rstrip("/") or "/"
             if path == "/":
                 self._reply(dashboard_html(server))
