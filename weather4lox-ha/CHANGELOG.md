@@ -18,7 +18,7 @@
 - New installations use neutral location defaults instead of project-specific example location data.
 - The Ingress dashboard deliberately omits location names, coordinates, tokens, and other private configuration values.
 - Cached forecasts are only accepted as fallback while the configured cache validity is active and the exact forecast end time is still in the future.
-- The diagnostics server now rejects requests that were not authenticated and forwarded by Home Assistant Ingress; its sidebar entry is explicitly administrator-only.
+- The diagnostics server only accepts authenticated requests from the Home Assistant Supervisor Ingress proxy at `172.30.32.2`; its sidebar entry is explicitly administrator-only.
 - Weather4Lox version updated to 0.6.0.
 
 ### Fixed

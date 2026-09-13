@@ -33,7 +33,7 @@ Use **Check now** to perform an immediate forecast refresh and validate the Loxo
 
 The dashboard does not expose configured location names, coordinates, access tokens, or other private configuration values.
 
-The diagnostics service is available only through Home Assistant Ingress. It requires the authenticated user header added by the Supervisor and is not published as a host port. The sidebar entry remains restricted to Home Assistant administrators.
+The diagnostics service is available only through Home Assistant Ingress. It accepts connections only from the Supervisor Ingress proxy at `172.30.32.2`, requires the authenticated user header added by the Supervisor, and is not published as a host port. The sidebar entry remains restricted to Home Assistant administrators.
 
 ## OpenWeatherMap
 

@@ -148,8 +148,19 @@ def test_webui_rejects_direct_request_without_ingress_identity():
     assert "Ingress required" in body
 
 
-def test_webui_accepts_authenticated_ingress_request():
+def test_webui_rejects_forged_ingress_header_from_other_ip():
     cache = make_cache(datetime.now(timezone.utc) + timedelta(hours=6))
+    status, body = request_webui(
+        FakeServer(cache),
+        headers={webui.INGRESS_USER_HEADER: "home-assistant-user-id"},
+    )
+    assert status == 403
+    assert "Ingress required" in body
+
+
+def test_webui_accepts_authenticated_ingress_request(monkeypatch):
+    cache = make_cache(datetime.now(timezone.utc) + timedelta(hours=6))
+    monkeypatch.setattr(webui, "INGRESS_PROXY_IP", "127.0.0.1")
     status, body = request_webui(
         FakeServer(cache),
         headers={webui.INGRESS_USER_HEADER: "home-assistant-user-id"},
@@ -158,10 +169,11 @@ def test_webui_accepts_authenticated_ingress_request():
     assert "Weather4Lox HA" in body
 
 
-def test_check_action_requires_ingress_and_uses_post():
+def test_check_action_requires_ingress_and_uses_post(monkeypatch):
     cache = make_cache(datetime.now(timezone.utc) + timedelta(hours=6))
     server = FakeServer(cache)
     headers = {webui.INGRESS_USER_HEADER: "home-assistant-user-id"}
+    monkeypatch.setattr(webui, "INGRESS_PROXY_IP", "127.0.0.1")
 
     get_status, _ = request_webui(server, path="/api/check", headers=headers)
     post_status, _ = request_webui(server, method="POST", path="/api/check", headers=headers)

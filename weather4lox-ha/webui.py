@@ -9,6 +9,7 @@ from threading import Thread
 
 INGRESS_HOST = "0.0.0.0"
 INGRESS_PORT = 8099
+INGRESS_PROXY_IP = "172.30.32.2"
 INGRESS_USER_HEADER = "X-Remote-User-Id"
 
 
@@ -25,9 +26,10 @@ def cache_is_usable(server, item, provider, entity):
     return bool(item and entity and server.cache_is_valid(item, provider, entity))
 
 
-def is_ingress_request(headers):
+def is_ingress_request(headers, client_ip):
     """Accept requests authenticated and forwarded by Home Assistant Ingress."""
-    return bool(str(headers.get(INGRESS_USER_HEADER, "")).strip())
+    user_id = str(headers.get(INGRESS_USER_HEADER, "")).strip()
+    return client_ip == INGRESS_PROXY_IP and bool(user_id)
 
 
 def _friendly_error(provider, entity, raw_error, cache_state):
@@ -301,7 +303,7 @@ def make_handler(server):
             self._reply(json.dumps(data, ensure_ascii=False, indent=2, default=str), status, "application/json; charset=utf-8")
 
         def _is_authorized(self):
-            if is_ingress_request(self.headers):
+            if is_ingress_request(self.headers, self.client_address[0]):
                 return True
             self._reply("Forbidden: Home Assistant Ingress required\n", 403, "text/plain; charset=utf-8")
             return False
