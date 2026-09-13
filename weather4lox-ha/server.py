@@ -261,7 +261,7 @@ def cache_has_current_forecast(item):
         end = max(dates) if dates else None
     if end is None:
         return False
-    return end.astimezone().date() >= datetime.now().astimezone().date()
+    return end.astimezone(timezone.utc) >= datetime.now(timezone.utc)
 
 
 def cache_is_valid(item, provider, entity):
